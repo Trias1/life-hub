@@ -1,0 +1,3 @@
+﻿insert into storage.buckets (id, name, public) values ('workspace-files', 'workspace-files', false) on conflict (id) do nothing;
+create policy "members can read workspace files" on storage.objects for select using (bucket_id = 'workspace-files' and exists (select 1 from public.workspace_members m where m.workspace_id::text = (storage.foldername(name))[1] and m.user_id = auth.uid()));
+create policy "members can upload workspace files" on storage.objects for insert with check (bucket_id = 'workspace-files' and exists (select 1 from public.workspace_members m where m.workspace_id::text = (storage.foldername(name))[1] and m.user_id = auth.uid()));

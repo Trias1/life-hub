@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿# LifeHub App
 
-## Getting Started
+Next.js 15 + Supabase SSR workspace app.
 
-First, run the development server:
+## Local setup
 
 ```bash
+npm install
+copy .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Isi `.env.local` dengan:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verification
 
-## Learn More
+```bash
+npm run lint
+npm run self-check
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Supabase migrations
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Migration dikumpulkan di `supabase/migrations/` dan belum dijalankan otomatis.
+Jalankan setelah project Supabase siap dan credentials sudah dikonfigurasi:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+supabase db push
+```
 
-## Deploy on Vercel
+Migration saat ini:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `0001_workspace.sql`
+- `0002_core_modules.sql`
+- `0003_calendar_bookmarks.sql`
+- `0004_files_notifications_activity.sql`
+- `0005_team_invitations.sql`
+- `0006_storage_bucket.sql`
+- `0007_repair_workspace_membership.sql` through `0013_note_versions.sql`
+- `0014_backend_foundations.sql`
+- `0015_advanced_module_backend.sql`
+- `0016_notification_center.sql`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Jangan menjalankan migration production tanpa review dan backup.

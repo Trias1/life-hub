@@ -1,0 +1,6 @@
+import { createWorkspace } from "./actions"
+
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams
+  return <main className="flex min-h-screen items-center justify-center px-4 py-10"><section className="surface w-full max-w-md p-6 sm:p-8"><div className="flex items-center gap-3"><span className="brand-mark">LH</span><div><p className="font-semibold tracking-tight">LifeHub</p><p className="text-xs text-zinc-500">A calm place to begin</p></div></div><div className="mt-10"><p className="eyebrow">Step 1 of 1</p><h1 className="page-title">Create your workspace</h1><p className="page-description">Your workspace keeps data and collaboration together.</p></div>{error && <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}<form action={createWorkspace} className="form-grid mt-8"><label className="field-label">Workspace name<input required name="name" className="field-control" placeholder="My workspace" /></label><label className="field-label">Workspace slug<input required name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" className="field-control" placeholder="my-workspace" /></label><button className="button-primary w-full">Create workspace</button></form></section></main>
+}

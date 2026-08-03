@@ -1,0 +1,2 @@
+alter table public.calendar_events add column if not exists reminder_sent_for timestamptz;
+create index if not exists calendar_events_reminder_idx on public.calendar_events(reminder_minutes, starts_at, reminder_sent_for);
