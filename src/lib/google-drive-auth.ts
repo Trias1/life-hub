@@ -2,7 +2,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
-export const GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:3000/api/auth/google/callback"
 
 function required(name: string) {
   const value = process.env[name]
@@ -10,12 +9,12 @@ function required(name: string) {
   return value
 }
 
-export function createGoogleOAuthClient() {
-  return new google.auth.OAuth2(required("GOOGLE_CLIENT_ID"), required("GOOGLE_CLIENT_SECRET"), GOOGLE_OAUTH_REDIRECT_URI)
+export function createGoogleOAuthClient(redirectUri?: string) {
+  return new google.auth.OAuth2(required("GOOGLE_CLIENT_ID"), required("GOOGLE_CLIENT_SECRET"), redirectUri)
 }
 
-export function getGoogleDriveAuthUrl(state: string) {
-  return createGoogleOAuthClient().generateAuthUrl({ access_type: "offline", prompt: "consent", scope: [GOOGLE_DRIVE_SCOPE], state })
+export function getGoogleDriveAuthUrl(state: string, redirectUri: string) {
+  return createGoogleOAuthClient(redirectUri).generateAuthUrl({ access_type: "offline", prompt: "consent", scope: [GOOGLE_DRIVE_SCOPE], state })
 }
 
 export async function getWorkspaceDriveConnection(workspaceId: string) {
