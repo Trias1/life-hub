@@ -9,6 +9,7 @@ import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
 const noteSchema = z.object({ title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80), tags: z.string().max(500) })
 const updateSchema = z.object({ id: z.string().uuid(), title: z.string().trim().min(1).max(160), content: z.string().max(10000) })
 const versionSchema = z.object({ noteId: z.string().uuid(), versionId: z.string().uuid() })
+const lifecycleSchema = z.object({ id: z.string().uuid(), from: z.enum(["archived", "trash"]) })
 type NoteActionResult = { error?: string; title?: string; content?: string }
 
 function parseTags(value: string) {
@@ -88,6 +89,43 @@ export async function trashNote(formData: FormData): Promise<void> {
   await recordActivity(context, { action: "Trashed", entityType: "note", entityId: id.data })
   revalidatePath("/notes")
   revalidatePath("/activity")
+}
+
+export async function restoreNote(formData: FormData): Promise<void> {
+  const input = lifecycleSchema.safeParse({ id: formData.get("id"), from: formData.get("from") })
+  if (!input.success) actionFailure("/notes", "restore note")
+  const sourcePath = "/notes?view=" + input.data.from
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure(sourcePath, "access the active workspace")
+
+  const update = { archived_at: null, deleted_at: null, updated_at: new Date().toISOString() }
+  const result = input.data.from === "archived"
+    ? await context.supabase.from("notes").update(update).eq("id", input.data.id).eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).not("archived_at", "is", null).is("deleted_at", null).select("id").maybeSingle()
+    : await context.supabase.from("notes").update(update).eq("id", input.data.id).eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).not("deleted_at", "is", null).select("id").maybeSingle()
+  if (result.error || !result.data) actionFailure(sourcePath, "restore note", result.error ?? new Error("Note not found"))
+
+  await recordActivity(context, { action: "Restored", entityType: "note", entityId: result.data.id })
+  revalidatePath("/notes")
+  revalidatePath("/activity")
+  redirect("/notes?success=Note%20restored")
+}
+
+export async function deleteNotePermanently(formData: FormData): Promise<void> {
+  const id = z.string().uuid().safeParse(formData.get("id"))
+  if (!id.success) actionFailure("/notes?view=trash", "delete note permanently")
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure("/notes?view=trash", "access the active workspace")
+
+  const { data: note, error: readError } = await context.supabase.from("notes").select("id").eq("id", id.data).eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).not("deleted_at", "is", null).maybeSingle()
+  if (readError || !note) actionFailure("/notes?view=trash", "delete note permanently", readError ?? new Error("Note not found"))
+
+  const { data: deleted, error } = await context.supabase.from("notes").delete().eq("id", note.id).eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).not("deleted_at", "is", null).select("id").maybeSingle()
+  if (error || !deleted) actionFailure("/notes?view=trash", "delete note permanently", error ?? new Error("Note not found"))
+
+  await recordActivity(context, { action: "Deleted permanently", entityType: "note", entityId: deleted.id })
+  revalidatePath("/notes")
+  revalidatePath("/activity")
+  redirect("/notes?view=trash&success=Note%20deleted%20permanently")
 }
 
 export async function toggleNoteFavorite(formData: FormData): Promise<void> {

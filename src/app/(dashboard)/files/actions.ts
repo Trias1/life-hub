@@ -94,7 +94,7 @@ export async function permanentlyDeleteFile(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/files?trash=true", "access the active workspace")
 
-  const { data: file, error: readError } = await context.supabase.from("files").select("id,google_file_id").eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).maybeSingle()
+  const { data: file, error: readError } = await context.supabase.from("files").select("id,google_file_id").eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).not("trashed_at", "is", null).maybeSingle()
   if (readError || !file) actionFailure("/files?trash=true", "find file", readError ?? new Error("File not found"))
 
   if (file.google_file_id) {
@@ -104,8 +104,7 @@ export async function permanentlyDeleteFile(formData: FormData): Promise<void> {
       actionFailure("/files?trash=true", "delete file from Google Drive", storageError(error))
     }
   }
-
-  const { error: deleteError } = await context.supabase.from("files").delete().eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id)
+  const { error: deleteError } = await context.supabase.from("files").delete().eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).not("trashed_at", "is", null)
   if (deleteError) actionFailure("/files?trash=true", "delete file metadata", deleteError)
   await recordActivity(context, { action: "Deleted permanently", entityType: "file", entityId: id.data })
   revalidatePath("/files")

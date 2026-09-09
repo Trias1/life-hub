@@ -1,4 +1,4 @@
-﻿import { createServerClient } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
@@ -18,7 +18,9 @@ export async function middleware(request: NextRequest) {
     },
   })
   const { data } = await supabase.auth.getClaims()
-  if (request.nextUrl.pathname.startsWith("/dashboard") && !data) return NextResponse.redirect(new URL("/login", request.url))
+  const protectedPaths = ["/dashboard", "/activity", "/bookmarks", "/calendar", "/customize", "/files", "/notes", "/notifications", "/profile", "/security", "/settings", "/tasks", "/team", "/onboarding"]
+  const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"))
+  if (isProtectedPath && !data) return NextResponse.redirect(new URL("/login", request.url))
   return response
 }
 

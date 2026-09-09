@@ -5,7 +5,8 @@ import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
 
-const taskSchema = z.object({ title: z.string().trim().min(1).max(160), priority: z.enum(["low", "medium", "high"]), dueDate: z.string().optional(), assigneeId: z.string().uuid().optional() })
+const taskSchema = z.object({ title: z.string().trim().min(1).max(160), priority: z.enum(["low", "medium", "high"]), dueDate: z.iso.date().optional(), assigneeId: z.string().uuid().optional() })
+const taskEditSchema = z.object({ taskId: z.string().uuid(), title: z.string().trim().min(1).max(160), description: z.string().trim().max(10000), priority: z.enum(["low", "medium", "high"]), dueDate: z.union([z.literal(""), z.iso.date()]) })
 const labelSchema = z.object({ name: z.string().trim().min(1).max(40), color: z.enum(["indigo", "blue", "emerald", "rose", "amber"]) })
 const taskIdSchema = z.object({ taskId: z.string().uuid() })
 const statusSchema = z.object({ id: z.string().uuid(), status: z.enum(["todo", "in_progress", "review", "done", "cancelled"]) })
@@ -33,9 +34,64 @@ export async function updateTaskStatus(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/tasks", "access the active workspace")
 
-  const { error } = await context.supabase.from("tasks").update({ status: input.data.status }).eq("id", input.data.id).eq("workspace_id", context.workspaceId)
-  if (error) actionFailure("/tasks", "update task", error)
+  const { data: task, error } = await context.supabase.from("tasks").update({ status: input.data.status }).eq("id", input.data.id).eq("workspace_id", context.workspaceId).is("deleted_at", null).select("id").maybeSingle()
+  if (error || !task) actionFailure("/tasks", "update task", error ?? new Error("Task not found"))
   await recordActivity(context, { action: "Moved to " + input.data.status, entityType: "task", entityId: input.data.id })
+  revalidatePath("/tasks")
+  revalidatePath("/activity")
+}
+
+export async function updateTask(formData: FormData): Promise<void> {
+  const input = taskEditSchema.safeParse({ taskId: formData.get("taskId"), title: formData.get("title"), description: formData.get("description"), priority: formData.get("priority"), dueDate: formData.get("dueDate") })
+  if (!input.success) actionFailure("/tasks", "update task")
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure("/tasks", "access the active workspace")
+
+  const { data: task, error } = await context.supabase.from("tasks").update({ title: input.data.title, description: input.data.description, priority: input.data.priority, due_date: input.data.dueDate || null, updated_at: new Date().toISOString() }).eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).is("deleted_at", null).select("id,title").maybeSingle()
+  if (error || !task) actionFailure("/tasks", "update task", error ?? new Error("Task not found"))
+  await recordActivity(context, { action: "Updated", entityType: "task", entityId: task.id, resourceName: task.title, link: "/tasks" })
+  revalidatePath("/tasks")
+  revalidatePath("/activity")
+}
+
+export async function trashTask(formData: FormData): Promise<void> {
+  const input = taskIdSchema.safeParse({ taskId: formData.get("taskId") })
+  if (!input.success) actionFailure("/tasks", "move task to trash")
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure("/tasks", "access the active workspace")
+
+  const now = new Date().toISOString()
+  const { data: task, error } = await context.supabase.from("tasks").update({ deleted_at: now, updated_at: now }).eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).is("deleted_at", null).select("id,title").maybeSingle()
+  if (error || !task) actionFailure("/tasks", "move task to trash", error ?? new Error("Task not found"))
+  await recordActivity(context, { action: "Trashed", entityType: "task", entityId: task.id, resourceName: task.title, link: "/tasks?view=trash" })
+  revalidatePath("/tasks")
+  revalidatePath("/activity")
+}
+
+export async function restoreTask(formData: FormData): Promise<void> {
+  const input = taskIdSchema.safeParse({ taskId: formData.get("taskId") })
+  if (!input.success) actionFailure("/tasks?view=trash", "restore task")
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure("/tasks?view=trash", "access the active workspace")
+
+  const { data: task, error } = await context.supabase.from("tasks").update({ deleted_at: null, updated_at: new Date().toISOString() }).eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).not("deleted_at", "is", null).select("id,title").maybeSingle()
+  if (error || !task) actionFailure("/tasks?view=trash", "restore task", error ?? new Error("Task not found"))
+  await recordActivity(context, { action: "Restored", entityType: "task", entityId: task.id, resourceName: task.title, link: "/tasks" })
+  revalidatePath("/tasks")
+  revalidatePath("/activity")
+}
+
+export async function deleteTaskPermanently(formData: FormData): Promise<void> {
+  const input = taskIdSchema.safeParse({ taskId: formData.get("taskId") })
+  if (!input.success) actionFailure("/tasks?view=trash", "delete task permanently")
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure("/tasks?view=trash", "access the active workspace")
+
+  const { data: task, error: readError } = await context.supabase.from("tasks").select("id,title,created_by").eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).not("deleted_at", "is", null).maybeSingle()
+  if (readError || !task || task.created_by !== context.user.id) actionFailure("/tasks?view=trash", "delete task permanently", readError ?? new Error("Only the task creator can delete it permanently"))
+  const { data: deleted, error } = await context.supabase.from("tasks").delete().eq("id", task.id).eq("workspace_id", context.workspaceId).eq("created_by", context.user.id).not("deleted_at", "is", null).select("id,title").maybeSingle()
+  if (error || !deleted) actionFailure("/tasks?view=trash", "delete task permanently", error ?? new Error("Task not found"))
+  await recordActivity(context, { action: "Deleted permanently", entityType: "task", entityId: deleted.id, resourceName: deleted.title, link: "/tasks?view=trash" })
   revalidatePath("/tasks")
   revalidatePath("/activity")
 }
@@ -45,7 +101,7 @@ async function getTaskContext(formData: FormData, operation: string) {
   if (!input.success) actionFailure("/tasks", operation)
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/tasks", "access the active workspace")
-  const { data: task, error } = await context.supabase.from("tasks").select("id").eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).maybeSingle()
+  const { data: task, error } = await context.supabase.from("tasks").select("id").eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).is("deleted_at", null).maybeSingle()
   if (error || !task) actionFailure("/tasks", operation, error ?? new Error("Task not found"))
   return { context, taskId: input.data.taskId }
 }
@@ -110,7 +166,7 @@ export async function toggleChecklistItem(formData: FormData): Promise<void> {
   if (!context) actionFailure("/tasks", "access the active workspace")
   const { data: item, error: itemError } = await context.supabase.from("task_checklist_items").select("id,task_id").eq("id", input.data.id).maybeSingle()
   if (itemError || !item) actionFailure("/tasks", "find checklist item", itemError ?? new Error("Checklist item not found"))
-  const { data: task, error: taskError } = await context.supabase.from("tasks").select("id").eq("id", item.task_id).eq("workspace_id", context.workspaceId).maybeSingle()
+  const { data: task, error: taskError } = await context.supabase.from("tasks").select("id").eq("id", item.task_id).eq("workspace_id", context.workspaceId).is("deleted_at", null).maybeSingle()
   if (taskError || !task) actionFailure("/tasks", "update checklist item", taskError ?? new Error("Task not found"))
   const completed = input.data.completed !== "true"
   const { error } = await context.supabase.from("task_checklist_items").update({ is_completed: completed, updated_at: new Date().toISOString() }).eq("id", input.data.id)

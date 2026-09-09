@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { expandCalendarEvents, type CalendarEventSource } from "@/lib/calendar/recurrence"
+import { notificationEnabled } from "@/lib/notification-preferences.mjs"
 
 export const runtime = "nodejs"
 
@@ -16,10 +17,15 @@ export async function GET(request: Request) {
   const { data: sourceEvents, error } = await supabase.from("calendar_events").select("id,workspace_id,title,description,starts_at,ends_at,recurrence_rule,color,reminder_minutes,reminder_sent_for,creator_id").gt("reminder_minutes", 0).limit(1000)
   if (error) return NextResponse.json({ error: "Could not load calendar reminders" }, { status: 500 })
   const events = (sourceEvents ?? []) as CalendarEventSource[]
-  const attendees = events.length ? await supabase.from("calendar_event_attendees").select("event_id,user_id").in("event_id", events.map((event) => event.id)) : { data: [] as Array<{ event_id: string; user_id: string | null }> }
+  const attendees = events.length ? await supabase.from("calendar_event_attendees").select("event_id,user_id").in("event_id", events.map((event) => event.id)) : { data: [] as Array<{ event_id: string; user_id: string | null }>, error: null }
+  if (attendees.error) return NextResponse.json({ error: "Could not load calendar attendees" }, { status: 500 })
   const recipientsByEvent = new Map<string, string[]>()
   for (const event of events) recipientsByEvent.set(event.id, [event.creator_id ?? ""])
   for (const attendee of attendees.data ?? []) if (attendee.user_id) recipientsByEvent.set(attendee.event_id, [...(recipientsByEvent.get(attendee.event_id) ?? []), attendee.user_id])
+  const recipientIds = Array.from(new Set(Array.from(recipientsByEvent.values()).flat().filter(Boolean)))
+  const preferencesResult = recipientIds.length ? await supabase.from("notification_preferences").select("user_id,calendar_enabled").in("user_id", recipientIds) : { data: [], error: null }
+  if (preferencesResult.error) return NextResponse.json({ error: "Could not load notification preferences" }, { status: 500 })
+  const preferencesByUser = new Map((preferencesResult.data ?? []).map((preferences) => [preferences.user_id, preferences]))
 
   const dueEvents = expandCalendarEvents(events, now, 2).filter((event) => {
     const startsAt = new Date(event.starts_at)
@@ -30,7 +36,7 @@ export async function GET(request: Request) {
   })
   let sent = 0
   for (const event of dueEvents) {
-    const recipients = Array.from(new Set((recipientsByEvent.get(event.source_id) ?? []).filter(Boolean)))
+    const recipients = Array.from(new Set((recipientsByEvent.get(event.source_id) ?? []).filter((recipientId) => recipientId && notificationEnabled(preferencesByUser.get(recipientId) ?? null, "calendar"))))
     const message = "Reminder: " + event.title + " starts " + new Date(event.starts_at).toLocaleString() + "."
     const { error: notificationError } = recipients.length ? await supabase.from("notifications").insert(recipients.map((recipientId) => ({ workspace_id: event.workspace_id, recipient_id: recipientId, actor_id: event.creator_id, type: "calendar", message, priority: "high", resource_type: "calendar event", resource_id: event.source_id, resource_name: event.title, link: "/calendar" }))) : { error: null }
     if (notificationError) continue

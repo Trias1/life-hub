@@ -1,4 +1,4 @@
-﻿# LifeHub App
+# LifeHub App
 
 Next.js 15 + Supabase SSR workspace app.
 
@@ -45,6 +45,6 @@ Migration saat ini:
 - `0007_repair_workspace_membership.sql` through `0013_note_versions.sql`
 - `0014_backend_foundations.sql`
 - `0015_advanced_module_backend.sql`
-- `0016_notification_center.sql`
+- `0016_notification_center.sql` through `0024_note_task_delete_policies.sql`
 
 Jangan menjalankan migration production tanpa review dan backup.

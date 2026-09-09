@@ -1,4 +1,4 @@
-﻿import { google } from "googleapis"
+import { google } from "googleapis"
 import { Readable } from "node:stream"
 import { createGoogleOAuthClient, getWorkspaceDriveConnection, saveWorkspaceDriveRoot, GOOGLE_DRIVE_SCOPE } from "@/lib/google-drive-auth"
 import type { StorageDownload, StorageService, StorageUploadInput, StorageUsage, StoredObject } from "./storage"
@@ -95,7 +95,7 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     const response = await drive.about.get({ fields: "storageQuota" })
     const quota = response.data.storageQuota
     return {
-      usedBytes: Number(quota?.usageInDrive ?? quota?.usage ?? 0),
+      usedBytes: Number(quota?.usage ?? quota?.usageInDrive ?? 0),
       limitBytes: quota?.limit ? Number(quota.limit) : null,
     }
   }
@@ -125,7 +125,13 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
 
   async function remove(fileId: string) {
     const { drive } = await driveForRequest()
-    await drive.files.delete({ fileId, supportsAllDrives: true })
+    try {
+      await drive.files.delete({ fileId, supportsAllDrives: true })
+    } catch (error) {
+      const status = (error as { response?: { status?: number }; code?: number }).response?.status ?? (error as { code?: number }).code
+      if (status === 404) return
+      throw error
+    }
   }
 
   async function rename(fileId: string, name: string) {

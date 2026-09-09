@@ -8,26 +8,34 @@
         "start": "next start",
         "lint": "eslint",
         "self-check": "node scripts/self-check.mjs",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test:integration": "node scripts/supabase-integration.mjs",
+        "test:e2e": "playwright test"
     },
     "dependencies": {
+        "@radix-ui/react-select": "^2.3.7",
         "@supabase/ssr": "^0.12.4",
         "@supabase/supabase-js": "^2.111.0",
+        "@uiw/react-md-editor": "^4.1.1",
+        "date-fns": "^4.4.0",
         "framer-motion": "^12.43.0",
         "googleapis": "^173.0.0",
         "lucide-react": "^1.28.0",
-        "next": "^15.5.22",
+        "next": "^16.3.0",
+        "nodemailer": "^9.0.4",
         "react": "^19.2.8",
+        "react-day-picker": "^10.0.1",
         "react-dom": "^19.2.8",
         "zod": "^4.4.3"
     },
     "devDependencies": {
+        "@playwright/test": "^1.62.1",
         "@tailwindcss/postcss": "^4",
         "@types/node": "^20",
         "@types/react": "^19",
         "@types/react-dom": "^19",
         "eslint": "^9",
-        "eslint-config-next": "^15.5.22",
+        "eslint-config-next": "^16.3.0",
         "tailwindcss": "^4",
         "typescript": "^5"
     }

@@ -1,7 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { X } from "lucide-react"
 import { TaskDetails, type TaskAdvancedProps } from "./task-details"
+import { Select } from "@/components/ui/select"
 
 type TaskStatus = "todo" | "in_progress" | "review" | "done" | "cancelled"
 type TaskPriority = "low" | "medium" | "high"
@@ -9,6 +11,7 @@ type DueFilter = "all" | "overdue" | "next_7_days" | "no_date"
 type Task = {
   id: string
   title: string
+  description: string
   status: TaskStatus
   priority: TaskPriority
   due_date?: string | null
@@ -75,6 +78,7 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
   const [due, setDue] = useState<DueFilter>("all")
   const [view, setView] = useState<"board" | "list">("board")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
+  const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null)
   const today = dateKey(new Date())
   const assignees = useMemo(() => [...new Set(tasks.map((task) => task.assignee_id).filter((id): id is string => Boolean(id)))], [tasks])
   const filteredTasks = useMemo(() => {
@@ -105,12 +109,10 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
     </div>
   )
   const editor = (task: Task) => (
-    <form id={`task-form-${task.id}`} action={action} className="mt-4 flex items-center gap-2">
+    <form id={`task-form-${task.id}`} action={action} onClick={(event) => event.stopPropagation()} className="mt-4 flex items-center gap-2">
       <input type="hidden" name="id" value={task.id} />
       <label className="sr-only" htmlFor={`status-${task.id}`}>Status for {task.title}</label>
-      <select id={`status-${task.id}`} name="status" defaultValue={task.status} className="field-control min-h-0 py-2 text-xs">
-        {columns.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </select>
+      <Select id={`status-${task.id}`} name="status" defaultValue={task.status} className="field-control min-h-0 py-2 text-xs" options={columns.map(([value, label]) => ({ value, label }))} />
       <button className="button-quiet min-h-0 px-2 py-1 text-xs">Save</button>
     </form>
   )
@@ -125,7 +127,7 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
   }
 
   return (
-    <section className="mt-8">
+    <section>
       <div className="surface p-4">
         <div className="toolbar">
           <div>
@@ -141,53 +143,37 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
           <label className="sr-only" htmlFor="task-search">Search tasks</label>
           <input id="task-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search tasks" className="field-control" />
           <label className="sr-only" htmlFor="task-status-filter">Filter by status</label>
-          <select id="task-status-filter" value={status} onChange={(event) => setStatus(event.target.value as "all" | TaskStatus)} className="field-control">
-            <option value="all">All statuses</option>
-            {columns.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
+          <Select id="task-status-filter" value={status} onChange={(value) => setStatus(value as "all" | TaskStatus)} className="field-control" options={[{ value: "all", label: "All statuses" }, ...columns.map(([value, label]) => ({ value, label }))]} />
           <label className="sr-only" htmlFor="task-priority-filter">Filter by priority</label>
-          <select id="task-priority-filter" value={priority} onChange={(event) => setPriority(event.target.value as "all" | TaskPriority)} className="field-control">
-            <option value="all">All priorities</option>
-            <option value="low">Low priority</option>
-            <option value="medium">Medium priority</option>
-            <option value="high">High priority</option>
-          </select>
+          <Select id="task-priority-filter" value={priority} onChange={(value) => setPriority(value as "all" | TaskPriority)} className="field-control" options={[{ value: "all", label: "All priorities" }, { value: "low", label: "Low priority" }, { value: "medium", label: "Medium priority" }, { value: "high", label: "High priority" }]} />
           <label className="sr-only" htmlFor="task-assignee-filter">Filter by assignee</label>
-          <select id="task-assignee-filter" value={assignee} onChange={(event) => setAssignee(event.target.value)} className="field-control">
-            <option value="all">All assignees</option>
-            <option value="unassigned">Unassigned</option>
-            {assignees.map((id) => <option key={id} value={id}>Member {shortId(id)}</option>)}
-          </select>
+          <Select id="task-assignee-filter" value={assignee} onChange={setAssignee} className="field-control" options={[{ value: "all", label: "All assignees" }, { value: "unassigned", label: "Unassigned" }, ...assignees.map((id) => ({ value: id, label: "Member " + shortId(id) }))]} />
           <label className="sr-only" htmlFor="task-due-filter">Filter by due date</label>
-          <select id="task-due-filter" value={due} onChange={(event) => setDue(event.target.value as DueFilter)} className="field-control">
-            <option value="all">Any due date</option>
-            <option value="overdue">Overdue</option>
-            <option value="next_7_days">Next 7 days</option>
-            <option value="no_date">No due date</option>
-          </select>
+          <Select id="task-due-filter" value={due} onChange={(value) => setDue(value as DueFilter)} className="field-control" options={[{ value: "all", label: "Any due date" }, { value: "overdue", label: "Overdue" }, { value: "next_7_days", label: "Next 7 days" }, { value: "no_date", label: "No due date" }]} />
           {hasFilters && <button type="button" onClick={clearFilters} className="button-quiet min-h-0 whitespace-nowrap px-2 text-xs">Clear</button>}
         </div>
       </div>
 
       {view === "list" ? (
-        <div className="mt-4 space-y-3">
+        <div className="task-board-column-tasks mt-4 space-y-3">
           {filteredTasks.length ? filteredTasks.map((task) => (
-            <article key={task.id} className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <article id={`task-${task.id}`} key={task.id} className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="font-medium">{task.title}</p>
+                {task.description && <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-500">{task.description}</p>}
                 {details(task, true)}
               </div>
               {editor(task)}
-              <TaskDetails taskId={task.id} assigneeId={task.assignee_id} advanced={advanced} />
+              <TaskDetails taskId={task.id} title={task.title} description={task.description} priority={task.priority} dueDate={task.due_date} assigneeId={task.assignee_id} advanced={advanced} />
             </article>
           )) : <div className="empty-state surface"><h2 className="font-semibold">No matching tasks</h2><p>Try a different search or filter.</p></div>}
         </div>
       ) : (
-        <div className="mt-4 grid gap-4 lg:grid-cols-4">
+        <div className="task-board-kanban mt-4">
           {columns.map(([columnStatus, label]) => {
             const columnTasks = filteredTasks.filter((task) => task.status === columnStatus)
             return (
-              <div key={columnStatus} className="surface-muted min-h-48 p-4" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); moveTask(columnStatus) }}>
+              <div key={columnStatus} className={"task-board-column surface-muted min-h-48 p-4" + (columnStatus === "cancelled" ? " task-board-column-cancelled" : "")} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); moveTask(columnStatus) }}>
                 <div className="toolbar">
                   <div>
                     <h2 className="font-semibold">{label}</h2>
@@ -195,13 +181,12 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
                   </div>
                   <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-zinc-500">{columnTasks.length}</span>
                 </div>
-                <div className="mt-4 space-y-3">
+                <div className="task-board-column-tasks mt-4 space-y-3">
                   {columnTasks.length ? columnTasks.map((task) => (
-                    <article key={task.id} draggable onDragStart={() => setDraggedTask(task.id)} onDragEnd={() => setDraggedTask(null)} className="surface cursor-grab p-4 active:cursor-grabbing">
+                    <article id={`task-${task.id}`} key={task.id} draggable onDragStart={() => setDraggedTask(task.id)} onDragEnd={() => setDraggedTask(null)} className="task-board-card surface cursor-grab p-4 active:cursor-grabbing" onClick={() => setDrawerTaskId(task.id)}>
                       <p className="font-medium">{task.title}</p>
                       {details(task)}
                       {editor(task)}
-              <TaskDetails taskId={task.id} assigneeId={task.assignee_id} advanced={advanced} />
                     </article>
                   )) : <p className="py-6 text-center text-sm text-zinc-400">Drop tasks here.</p>}
                 </div>
@@ -210,6 +195,28 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
           })}
         </div>
       )}
+
+      {view === "board" && drawerTaskId && (() => {
+        const drawerTask = tasks.find((task) => task.id === drawerTaskId)
+        if (!drawerTask) return null
+        return (
+          <>
+            <button type="button" className="task-drawer-backdrop" onClick={() => setDrawerTaskId(null)} aria-label="Close task details" />
+            <aside className="task-drawer" role="dialog" aria-modal="true" aria-labelledby="task-drawer-title">
+              <div className="task-drawer-header">
+                <div className="min-w-0">
+                  <h2 id="task-drawer-title" className="truncate text-lg font-semibold">{drawerTask.title}</h2>
+                  <span className={"mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold " + priorityStyles[drawerTask.priority]}>{drawerTask.priority} priority</span>
+                </div>
+                <button type="button" className="task-drawer-close" onClick={() => setDrawerTaskId(null)} aria-label="Close task details"><X size={18} /></button>
+              </div>
+              <div className="task-drawer-content">
+                <TaskDetails taskId={drawerTask.id} title={drawerTask.title} description={drawerTask.description} priority={drawerTask.priority} dueDate={drawerTask.due_date} assigneeId={drawerTask.assignee_id} advanced={advanced} />
+              </div>
+            </aside>
+          </>
+        )
+      })()}
     </section>
   )
 }

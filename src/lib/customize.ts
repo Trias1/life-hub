@@ -1,5 +1,5 @@
 export const accents = {
-  indigo: { label: "Graphite", color: "#111111", hover: "#000000" },
+  indigo: { label: "Graphite", color: "#111111", hover: "#2f333b" },
   blue: { label: "Blue", color: "#2563eb", hover: "#1d4ed8" },
   emerald: { label: "Green", color: "#059669", hover: "#047857" },
   orange: { label: "Orange", color: "#ea580c", hover: "#c2410c" },

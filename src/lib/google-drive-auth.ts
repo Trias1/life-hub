@@ -1,5 +1,6 @@
 ﻿import { google } from "googleapis"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { decryptToken, encryptToken } from "@/lib/token-crypto.mjs"
 
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
 
@@ -7,6 +8,13 @@ function required(name: string) {
   const value = process.env[name]
   if (!value) throw new Error("Missing required Google OAuth configuration: " + name)
   return value
+}
+
+function tokenSecret() {
+  // ponytail: reuse the existing server secret unless a dedicated encryption key is configured.
+  const secret = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY ?? process.env.SUPABASE_SECRET_KEY
+  if (!secret) throw new Error("Missing token encryption configuration")
+  return secret
 }
 
 export function createGoogleOAuthClient(redirectUri?: string) {
@@ -18,13 +26,36 @@ export function getGoogleDriveAuthUrl(state: string, redirectUri: string) {
 }
 
 export async function getWorkspaceDriveConnection(workspaceId: string) {
-  const { data, error } = await createAdminClient().from("workspace_google_drive_connections").select("workspace_id,refresh_token,root_folder_id").eq("workspace_id", workspaceId).maybeSingle()
+  const admin = createAdminClient()
+  const { data, error } = await admin.from("workspace_google_drive_connections").select("workspace_id,refresh_token,root_folder_id").eq("workspace_id", workspaceId).maybeSingle()
   if (error) throw error
-  return data
+  if (!data) return null
+  const refreshToken = decryptToken(data.refresh_token, tokenSecret())
+  if (!data.refresh_token.startsWith("v1:")) {
+    const { error: migrationError } = await admin.from("workspace_google_drive_connections").update({ refresh_token: encryptToken(refreshToken, tokenSecret()), updated_at: new Date().toISOString() }).eq("workspace_id", workspaceId)
+    if (migrationError) throw migrationError
+  }
+  return { ...data, refresh_token: refreshToken }
 }
 
 export async function saveWorkspaceDriveConnection(input: { workspaceId: string; refreshToken: string; connectedBy: string }) {
-  const { error } = await createAdminClient().from("workspace_google_drive_connections").upsert({ workspace_id: input.workspaceId, refresh_token: input.refreshToken, connected_by: input.connectedBy, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+  const { error } = await createAdminClient().from("workspace_google_drive_connections").upsert({ workspace_id: input.workspaceId, refresh_token: encryptToken(input.refreshToken, tokenSecret()), connected_by: input.connectedBy, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+  if (error) throw error
+}
+
+export async function disconnectWorkspaceDriveConnection(workspaceId: string) {
+  const connection = await getWorkspaceDriveConnection(workspaceId)
+  if (!connection) return
+  try {
+    await createGoogleOAuthClient().revokeToken(connection.refresh_token)
+  } catch (error) {
+    const response = error as { code?: number; response?: { status?: number; data?: { error?: unknown } } }
+    const status = response.response?.status ?? response.code
+    const errorCode = typeof response.response?.data?.error === "string" ? response.response.data.error : null
+    console.error("Could not revoke Google Drive token", { status, errorCode })
+    if (!(status === 400 && errorCode === "invalid_token")) throw new Error("Google token revocation failed")
+  }
+  const { error } = await createAdminClient().from("workspace_google_drive_connections").delete().eq("workspace_id", workspaceId)
   if (error) throw error
 }
 

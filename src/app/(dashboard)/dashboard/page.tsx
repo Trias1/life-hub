@@ -34,7 +34,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     recentFilesQuery.eq("space_id", spaceId)
     storageFilesQuery.eq("space_id", spaceId)
   }
-  const [tasks, events, notes, files, unread, activity, recentNotes, recentFiles, upcomingEvents, storageFiles, members] = await Promise.all([
+  const [tasks, events, notes, files, unread, activity, recentNotes, recentFiles, upcomingEvents, storageFiles, members, profile] = await Promise.all([
     tasksQuery.order("due_date", { ascending: true, nullsFirst: false }).limit(4),
     supabase.from("calendar_events").select("id,title,starts_at,ends_at", { count: "exact" }).eq("workspace_id", workspaceId).gte("starts_at", nowIso).lte("starts_at", nextWeek).order("starts_at", { ascending: true }).limit(4),
     notesQuery.order("updated_at", { ascending: false }).limit(4),
@@ -46,8 +46,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     supabase.from("calendar_events").select("id,title,starts_at,ends_at").eq("workspace_id", workspaceId).gte("starts_at", nowIso).order("starts_at", { ascending: true }).limit(4),
     storageFilesQuery,
     supabase.from("workspace_members").select("user_id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
   ])
-  const displayName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "there"
+  const displayName = profile.data?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "there"
   const storageBytes = (storageFiles.data ?? []).reduce((total, file) => total + Number(file.size_bytes ?? 0), 0)
   const continueItems = [
     ...(tasks.data ?? []).map((item) => ({ id: item.id, title: item.title, type: "Task", detail: item.due_date ? "Due " + item.due_date : "Open task", time: item.due_date ? new Date(item.due_date).getTime() : 0 })),

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
+import { parseCsv } from "@/lib/csv.mjs"
 
 const schema = z.object({ title: z.string().trim().min(1).max(160), url: z.string().url().startsWith("https://"), collection: z.string().trim().min(1).max(80), tags: z.string().max(500) })
 
@@ -54,12 +55,16 @@ export async function importBookmarks(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/bookmarks", "access the active workspace")
 
-  const lines = (await value.text()).split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-  const rows = lines[0]?.toLowerCase().startsWith("title,") ? lines.slice(1) : lines
-  const records = rows.map((line) => {
-    const [title, url, collection = "General", tagText = ""] = line.split(",").map((item) => item.trim())
+  let rows: string[][]
+  try {
+    const parsed = parseCsv(await value.text())
+    rows = parsed[0]?.map((item) => item.trim().toLowerCase()).join(",") === "title,url,collection,tags" ? parsed.slice(1) : parsed
+  } catch (error) {
+    actionFailure("/bookmarks", "import bookmarks", error instanceof Error ? error : null)
+  }
+  const records = rows.map(([title = "", url = "", collection = "General", tagText = ""]) => {
     return schema.safeParse({ title, url, collection, tags: tagText })
-  }).filter((result) => result.success).map((result) => ({ title: result.data.title, url: result.data.url, collection: result.data.collection, tags: tags(result.data.tags), workspace_id: context.workspaceId, creator_id: context.user.id }))
+  }).filter((result) => result.success).map((result) => ({ title: result.data.title, url: result.data.url, collection: result.data.collection, tags: tags(result.data.tags.replaceAll("|", ",")), workspace_id: context.workspaceId, creator_id: context.user.id }))
   if (!records.length) actionFailure("/bookmarks", "import bookmarks")
 
   const { error } = await context.supabase.from("bookmarks").insert(records)

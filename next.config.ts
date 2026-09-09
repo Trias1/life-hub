@@ -2,6 +2,9 @@
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  experimental: {
+    serverActions: { bodySizeLimit: "3mb" },
+  },
   async headers() {
     return [{
       source: "/(.*)",

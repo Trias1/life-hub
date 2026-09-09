@@ -1,9 +1,29 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { notificationEnabled } from "@/lib/notification-preferences.mjs"
 
 type WorkspaceMembership = { workspace_id: string; role: string }
 
 type ActivityInput = { action: string; entityType: string; entityId?: string | null; resourceName?: string | null; link?: string | null; notify?: boolean }
 type NotificationInput = { recipientId: string; type: string; message: string; priority?: "low" | "normal" | "high" | "urgent"; resourceType?: string; resourceId?: string | null; resourceName?: string; link?: string }
+type NotificationDeliveryInput = Omit<NotificationInput, "recipientId"> & { recipientId?: string | null; preferenceType: string }
+
+async function deliverNotifications(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, input: NotificationDeliveryInput) {
+  const admin = createAdminClient()
+  const membersResult = input.recipientId
+    ? await admin.from("workspace_members").select("user_id").eq("workspace_id", context.workspaceId).eq("user_id", input.recipientId)
+    : await admin.from("workspace_members").select("user_id").eq("workspace_id", context.workspaceId).neq("user_id", context.user.id)
+  if (membersResult.error) return { error: membersResult.error }
+  const memberIds = (membersResult.data ?? []).map((member) => member.user_id)
+  if (!memberIds.length) return {}
+  const preferencesResult = await admin.from("notification_preferences").select("user_id,mentions_enabled,tasks_enabled,calendar_enabled,notes_enabled,files_enabled,bookmarks_enabled").in("user_id", memberIds)
+  if (preferencesResult.error) return { error: preferencesResult.error }
+  const preferencesByUser = new Map((preferencesResult.data ?? []).map((preferences) => [preferences.user_id, preferences]))
+  const recipients = memberIds.filter((userId) => userId !== context.user.id && notificationEnabled(preferencesByUser.get(userId) ?? null, input.preferenceType))
+  if (!recipients.length) return {}
+  const { error } = await admin.from("notifications").insert(recipients.map((recipientId) => ({ workspace_id: context.workspaceId, recipient_id: recipientId, actor_id: context.user.id, type: input.type, message: input.message, priority: input.priority ?? "normal", resource_type: input.resourceType ?? null, resource_id: input.resourceId ?? null, resource_name: input.resourceName ?? null, link: input.link ?? null })))
+  return error ? { error } : {}
+}
 
 export async function getWorkspaceContext() {
   const supabase = await createClient()
@@ -24,8 +44,15 @@ export async function setActiveWorkspace(workspaceId: string) {
   const context = await getWorkspaceContext()
   if (!context || !context.memberships.some((membership: WorkspaceMembership) => membership.workspace_id === workspaceId)) return { error: "Workspace not found." }
 
-  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, active_workspace_id: workspaceId, updated_at: new Date().toISOString() })
-  return error ? { error: "Could not switch workspace." } : {}
+  const { error } = await context.supabase.from("profiles").upsert(
+    { id: context.user.id, active_workspace_id: workspaceId, updated_at: new Date().toISOString() },
+    { onConflict: "id" },
+  )
+  if (error) {
+    console.error("Could not switch active workspace", error)
+    return { error: "Could not switch workspace." }
+  }
+  return {}
 }
 
 export async function recordActivity(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, input: ActivityInput) {
@@ -36,20 +63,13 @@ export async function recordActivity(context: NonNullable<Awaited<ReturnType<typ
   }
   if (input.notify === false) return {}
 
-  const { data: members, error: membersError } = await context.supabase.from("workspace_members").select("user_id").eq("workspace_id", context.workspaceId).neq("user_id", context.user.id)
-  if (membersError) {
-    console.error("Could not load activity recipients", membersError)
-    return { error: membersError }
-  }
-  const recipients = (members ?? []).map((member) => ({ workspace_id: context.workspaceId, recipient_id: member.user_id, actor_id: context.user.id, type: "activity", message: (context.user.email?.split("@")[0] ?? "A workspace member") + " " + input.action.toLowerCase() + " " + input.entityType + ".", priority: "normal" as const, resource_type: input.entityType, resource_id: input.entityId ?? null, resource_name: input.resourceName ?? null, link: input.link ?? null }))
-  if (!recipients.length) return {}
-  const { error: notificationError } = await context.supabase.from("notifications").insert(recipients)
+  const { error: notificationError } = await deliverNotifications(context, { recipientId: null, type: "activity", preferenceType: input.entityType, message: (context.user.email?.split("@")[0] ?? "A workspace member") + " " + input.action.toLowerCase() + " " + input.entityType + ".", priority: "normal", resourceType: input.entityType, resourceId: input.entityId ?? null, resourceName: input.resourceName ?? undefined, link: input.link ?? undefined })
   if (notificationError) console.error("Could not create activity notifications", notificationError)
   return notificationError ? { error: notificationError } : {}
 }
 
 export async function createNotification(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, input: NotificationInput) {
   if (input.recipientId === context.user.id) return
-  const { error } = await context.supabase.from("notifications").insert({ workspace_id: context.workspaceId, recipient_id: input.recipientId, actor_id: context.user.id, type: input.type, message: input.message, priority: input.priority ?? "normal", resource_type: input.resourceType ?? null, resource_id: input.resourceId ?? null, resource_name: input.resourceName ?? null, link: input.link ?? null })
+  const { error } = await deliverNotifications(context, { ...input, preferenceType: input.type })
   if (error) console.error("Could not create notification", error)
 }
