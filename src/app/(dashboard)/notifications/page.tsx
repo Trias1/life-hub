@@ -12,7 +12,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   let query = context.supabase.from("notifications").select("id,message,type,is_read,created_at,priority,resource_name,link").eq("workspace_id", context.workspaceId).eq("recipient_id", context.user.id)
   query = view === "archive" ? query.not("archived_at", "is", null) : query.is("archived_at", null)
   const { data, error } = await query.order("created_at", { ascending: false }).limit(200)
-  if (error) console.error("load notifications", error)
+  if (error) console.error("load notifications")
 
   const notifications = data ?? []
   const unread = view === "active" ? notifications.filter((item) => !item.is_read).length : 0

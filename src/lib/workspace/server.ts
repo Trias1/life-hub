@@ -44,12 +44,29 @@ export async function setActiveWorkspace(workspaceId: string) {
   const context = await getWorkspaceContext()
   if (!context || !context.memberships.some((membership: WorkspaceMembership) => membership.workspace_id === workspaceId)) return { error: "Workspace not found." }
 
-  const { error } = await context.supabase.from("profiles").upsert(
-    { id: context.user.id, active_workspace_id: workspaceId, updated_at: new Date().toISOString() },
-    { onConflict: "id" },
-  )
-  if (error) {
-    console.error("Could not switch active workspace", error)
+  const updatedAt = new Date().toISOString()
+  const { data: profile, error: profileError } = await context.supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", context.user.id)
+    .maybeSingle()
+
+  if (profileError) {
+    console.error("Could not read profile while switching workspace")
+    return { error: "Could not switch workspace." }
+  }
+
+  const result = profile
+    ? await context.supabase
+        .from("profiles")
+        .update({ active_workspace_id: workspaceId, updated_at: updatedAt })
+        .eq("id", context.user.id)
+    : await context.supabase
+        .from("profiles")
+        .insert({ id: context.user.id, active_workspace_id: workspaceId, updated_at: updatedAt })
+
+  if (result.error) {
+    console.error("Could not switch active workspace")
     return { error: "Could not switch workspace." }
   }
   return {}
@@ -58,18 +75,18 @@ export async function setActiveWorkspace(workspaceId: string) {
 export async function recordActivity(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, input: ActivityInput) {
   const { error } = await context.supabase.from("activity_logs").insert({ workspace_id: context.workspaceId, actor_id: context.user.id, action: input.action, entity_type: input.entityType, entity_id: input.entityId ?? null })
   if (error) {
-    console.error("Could not record activity", error)
+    console.error("Could not record activity")
     return { error }
   }
   if (input.notify === false) return {}
 
   const { error: notificationError } = await deliverNotifications(context, { recipientId: null, type: "activity", preferenceType: input.entityType, message: (context.user.email?.split("@")[0] ?? "A workspace member") + " " + input.action.toLowerCase() + " " + input.entityType + ".", priority: "normal", resourceType: input.entityType, resourceId: input.entityId ?? null, resourceName: input.resourceName ?? undefined, link: input.link ?? undefined })
-  if (notificationError) console.error("Could not create activity notifications", notificationError)
+  if (notificationError) console.error("Could not create activity notifications")
   return notificationError ? { error: notificationError } : {}
 }
 
 export async function createNotification(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, input: NotificationInput) {
   if (input.recipientId === context.user.id) return
   const { error } = await deliverNotifications(context, { ...input, preferenceType: input.type })
-  if (error) console.error("Could not create notification", error)
+  if (error) console.error("Could not create notification")
 }

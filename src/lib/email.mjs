@@ -32,7 +32,6 @@ async function sendWithGmail({ email, role, link }) {
     subject: "You are invited to join LifeHub",
     html: `<p>You have been invited to join a LifeHub workspace as <strong>${escapeHtml(role)}</strong>.</p><p><a href="${escapeHtml(link)}">Accept invitation</a></p><p>If the button does not work, copy this link:</p><p>${escapeHtml(link)}</p>`,
   })
-  console.log("[gmail] invitation accepted", { messageId: result.messageId, accepted: result.accepted, rejected: result.rejected, response: result.response })
   return "sent"
 }
 
@@ -53,7 +52,7 @@ export async function sendWorkspaceInvitation({ email, token, role }) {
     })
     if (response.ok) return "sent"
     const details = await response.text()
-    console.error("[resend] invitation rejected", { status: response.status, details })
+    console.error("[resend] invitation rejected", { status: response.status })
   }
   return sendWithGmail({ email, role, link })
 }

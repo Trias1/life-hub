@@ -18,6 +18,9 @@ type Props = {
   activity: Activity[];
   updateProfile: FormAction;
   uploadProfileAvatar: FormAction;
+  googleConnected: boolean;
+  googleStatus: string | null;
+  disconnectGoogle: () => Promise<void>;
 };
 type Tab = "overview" | "activity" | "security" | "sessions" | "accounts";
 
@@ -28,9 +31,12 @@ export function ProfileStudio({
   activity,
   updateProfile,
   uploadProfileAvatar,
+  googleConnected,
+  googleStatus,
+  disconnectGoogle,
 }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
-  const name = profile?.display_name || email.split("@")[0] || "LifeHub user";
+  const name = profile?.display_name || email.split("@")[0] || "Sanctum Cove user";
   const completion =
     [
       profile?.display_name,
@@ -158,21 +164,30 @@ export function ProfileStudio({
   );
   const accounts = (
     <div className="grid gap-3 sm:grid-cols-2">
-      {["Google", "GitHub", "Discord", "Microsoft"].map((provider) => (
+      <article className="profile-provider">
+        <div>
+          <p className="font-semibold">Google</p>
+          <p className="mt-1 text-sm text-zinc-500">{googleConnected ? "Connected" : "Not connected"}</p>
+        </div>
+        {googleConnected ? (
+          <form action={disconnectGoogle}>
+            <button className="button-secondary min-h-0 px-3 py-2 text-xs">Disconnect</button>
+          </form>
+        ) : (
+          <a href="/api/auth/google/account/login" className="button-primary min-h-0 px-3 py-2 text-xs">Connect Google</a>
+        )}
+      </article>
+      {["GitHub", "Discord", "Microsoft"].map((provider) => (
         <article key={provider} className="profile-provider">
           <div>
             <p className="font-semibold">{provider}</p>
-            <p className="mt-1 text-sm text-zinc-500">Not connected</p>
+            <p className="mt-1 text-sm text-zinc-500">Coming soon</p>
           </div>
-          <button
-            type="button"
-            disabled
-            className="button-secondary min-h-0 px-3 py-2 text-xs"
-          >
-            Unavailable
-          </button>
+          <span className="rounded-full bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">Coming soon</span>
         </article>
       ))}
+      {googleStatus === "connected" && <p className="sm:col-span-2 text-sm text-emerald-600">Google account connected successfully.</p>}
+      {googleStatus === "disconnected" && <p className="sm:col-span-2 text-sm text-zinc-500">Google account disconnected.</p>}
     </div>
   );
   const content =
@@ -216,7 +231,7 @@ export function ProfileStudio({
           <div className="min-w-0 flex-1">
             <p className="text-2xl font-semibold tracking-tight">{name}</p>
             <p className="mt-1 text-sm text-zinc-500">
-              @{profile?.username || "username"} ? LifeHub workspace
+              @{profile?.username || "username"} ? Sanctum Cove workspace
             </p>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
               {profile?.bio ||

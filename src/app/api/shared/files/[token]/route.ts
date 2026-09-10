@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     const disposition = new URL(request.url).searchParams.get("inline") === "1" ? "inline" : "attachment"
     return new NextResponse(Readable.toWeb(download.body) as ReadableStream, { headers: { "Content-Type": download.mimeType || file.mime_type, "Content-Length": String(download.sizeBytes || file.size_bytes), "Content-Disposition": disposition + "; filename*=UTF-8''" + encodeURIComponent(download.name || file.name), "Cache-Control": "private, no-store" } })
   } catch (downloadError) {
-    console.error("download shared file", downloadError)
+    console.error("download shared file")
     return NextResponse.json({ error: "Could not download shared file" }, { status: 502 })
   }
 }

@@ -37,7 +37,7 @@ export async function inviteMember(formData: FormData): Promise<void> {
   try {
     emailStatus = await sendWorkspaceInvitation({ email: input.data.email.toLowerCase(), token, role: input.data.role })
   } catch (emailError) {
-    console.error("Could not send workspace invitation", { message: emailError instanceof Error ? emailError.message : "unknown error" })
+    console.error("Could not send workspace invitation", emailError instanceof Error ? emailError.message : "unknown error")
     emailStatus = "failed"
   }
   revalidatePath("/team")

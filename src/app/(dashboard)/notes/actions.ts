@@ -17,7 +17,7 @@ function parseTags(value: string) {
 }
 
 export async function createNote(formData: FormData): Promise<void> {
-  const input = noteSchema.safeParse({ title: formData.get("title"), content: formData.get("content"), folder: formData.get("folder") ?? "General", tags: formData.get("tags") ?? "" })
+  const input = noteSchema.safeParse({ title: formData.get("title"), content: formData.get("content") ?? "", folder: formData.get("folder") ?? "General", tags: formData.get("tags") ?? "" })
   if (!input.success) actionFailure("/notes", "create note")
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/notes", "access the active workspace")

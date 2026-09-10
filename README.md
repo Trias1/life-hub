@@ -1,4 +1,4 @@
-# LifeHub App
+# Sanctum Cove App
 
 Next.js 16 + Supabase SSR workspace app with Google Drive-backed file storage.
 

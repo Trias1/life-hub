@@ -11,7 +11,8 @@ import {
 } from "./_actions/spaces";
 import { selectWorkspace } from "./_actions/workspaces";
 import { markAllNotificationsRead } from "@/app/(dashboard)/notifications/actions";
-import { getStorageForWorkspace } from "@/lib/storage/storage";
+import { getStorageForWorkspace } from "@/lib/storage/storage"
+import { clearWorkspaceDriveConnection, isGoogleInvalidGrant } from "@/lib/google-drive-auth";
 
 export default async function DashboardLayout({
   children,
@@ -120,7 +121,15 @@ export default async function DashboardLayout({
     storageBytes = driveUsage.usedBytes;
     storageLimitBytes = driveUsage.limitBytes ?? storageLimitBytes;
   } catch (error) {
-    console.error("Could not load Google Drive storage quota", error);
+    if (isGoogleInvalidGrant(error)) {
+      try {
+        await clearWorkspaceDriveConnection(context.workspaceId)
+      } catch (clearError) {
+        console.error("Could not clear invalid Google Drive connection")
+      }
+    } else {
+      console.error("Could not load Google Drive storage quota")
+    }
   }
   const avatarUrl = profile?.avatar_google_file_id
     ? "/api/profile/avatar?v=" + encodeURIComponent(profile.updated_at ?? "")

@@ -38,7 +38,7 @@ export async function uploadFile(formData: FormData): Promise<void> {
     try {
       await storage.delete(uploaded.id)
     } catch (rollbackError) {
-      console.error("Could not remove orphaned Google Drive upload", rollbackError)
+      console.error("Could not remove orphaned Google Drive upload")
     }
     actionFailure("/files", "save file metadata", error)
   }
@@ -46,6 +46,7 @@ export async function uploadFile(formData: FormData): Promise<void> {
   await recordActivity(context, { action: "Uploaded", entityType: "file", entityId: file.id })
   revalidatePath("/files")
   revalidatePath("/activity")
+  redirect("/files?success=File%20uploaded")
 }
 
 export async function toggleFileFavorite(formData: FormData): Promise<void> {
@@ -134,7 +135,7 @@ export async function uploadFileVersion(formData: FormData): Promise<void> {
     try {
       await storage.delete(uploaded.id)
     } catch (rollbackError) {
-      console.error("Could not remove orphaned Google Drive file version", rollbackError)
+      console.error("Could not remove orphaned Google Drive file version")
     }
     actionFailure("/files", "save file version metadata", error)
   }

@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const disposition = new URL(request.url).searchParams.get("inline") === "1" ? "inline" : "attachment"
     return new NextResponse(Readable.toWeb(download.body) as ReadableStream, { headers: { "Content-Type": download.mimeType || version.mime_type, "Content-Length": String(download.sizeBytes || version.size_bytes), "Content-Disposition": disposition + "; filename*=UTF-8''" + encodeURIComponent(download.name || version.name), "Cache-Control": "private, no-store" } })
   } catch (downloadError) {
-    console.error("download file version", downloadError)
+    console.error("download file version")
     return NextResponse.json({ error: "Could not download file version" }, { status: 502 })
   }
 }

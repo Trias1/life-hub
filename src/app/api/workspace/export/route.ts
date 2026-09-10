@@ -20,7 +20,7 @@ export async function GET() {
   const results = await Promise.all(tables.map(([, query]) => query))
   const failed = results.find((result) => result.error)
   if (failed?.error) {
-    console.error("workspace export", failed.error)
+    console.error("workspace export failed")
     return Response.json({ error: "Could not export workspace" }, { status: 500 })
   }
 

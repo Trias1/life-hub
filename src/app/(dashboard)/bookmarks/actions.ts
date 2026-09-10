@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
@@ -23,6 +24,7 @@ export async function createBookmark(formData: FormData): Promise<void> {
   await recordActivity(context, { action: "Created", entityType: "bookmark", entityId: bookmark.id })
   revalidatePath("/bookmarks")
   revalidatePath("/activity")
+  redirect("/bookmarks?success=Bookmark%20created")
 }
 
 export async function toggleBookmarkFavorite(formData: FormData): Promise<void> {

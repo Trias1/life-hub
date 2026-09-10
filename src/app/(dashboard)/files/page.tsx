@@ -66,7 +66,7 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
     const driveUsage = await getStorageForWorkspace(context.workspaceId).getUsage()
     storageUsage = { usedBytes: driveUsage.usedBytes, limitBytes: driveUsage.limitBytes ?? storageUsage.limitBytes }
   } catch (error) {
-    console.error("Could not load Google Drive storage quota", error)
+    console.error("Could not load Google Drive storage quota")
   }
   const storagePercent = storageUsage.limitBytes ? Math.min(100, (storageUsage.usedBytes / storageUsage.limitBytes) * 100) : 0
   const filesWithUrls = files.map((file) => ({ ...file, downloadUrl: file.google_file_id ? "/api/files/" + file.id + "/download" : null, previewUrl: file.google_file_id && (file.mime_type.startsWith("image/") || file.mime_type === "application/pdf") ? "/api/files/" + file.id + "/download?inline=1" : null, imagePreviewUrl: file.google_file_id && file.mime_type.startsWith("image/") ? "/api/files/" + file.id + "/download?inline=1" : null }))

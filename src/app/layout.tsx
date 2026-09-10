@@ -23,7 +23,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "LifeHub",
+  title: "Sanctum Cove",
   description: "A focused workspace for work and life.",
 };
 

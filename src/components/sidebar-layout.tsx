@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
+import { InactivityGuard } from "@/components/inactivity-guard";
 import { PageMotion } from "@/components/page-motion";
 import { ActionFeedback } from "@/components/action-feedback";
+import { Toaster } from "sonner";
 import { NotificationRealtime } from "@/components/notification-realtime";
 import { Sidebar } from "@/components/sidebar";
 import { TopNavbar } from "@/components/top-navbar";
@@ -179,8 +181,10 @@ export function SidebarLayout({
           onOpenMobile={() => setMobileOpen(true)}
         />
         <PageMotion>{children}</PageMotion>
+        <Toaster position="bottom-right" closeButton richColors />
         <ActionFeedback />
         <NotificationRealtime userId={user.id} />
+        <InactivityGuard signOut={signOut} />
         <KeyboardShortcuts />
       </main>
     </div>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { Select } from "@/components/ui/select";
 import { getWorkspaceContext } from "@/lib/workspace/server";
 import { TaskBoard } from "@/components/task-board";
 import {
@@ -311,69 +312,79 @@ export default async function TasksPage({
             placeholder="What needs to happen?"
             className="field-control"
           />
-          <label className="sr-only" htmlFor="task-priority">
-            Task priority
-          </label>
-          <select
-            id="task-priority"
+          <Select
             name="priority"
             defaultValue="medium"
-            className="field-control"
-          >
-            <option value="low">Low priority</option>
-            <option value="medium">Medium priority</option>
-            <option value="high">High priority</option>
-          </select>
+            options={[
+              { value: "low", label: "Low priority" },
+              { value: "medium", label: "Medium priority" },
+              { value: "high", label: "High priority" },
+            ]}
+          />
           <label className="sr-only" htmlFor="task-due-date">
             Due date
           </label>
           <DateTimePicker name="dueDate" dateOnly />
-          <label className="sr-only" htmlFor="task-assignee">
-            Task assignee
-          </label>
-          <select
-            id="task-assignee"
+          <Select
             name="assigneeId"
             defaultValue=""
-            className="field-control"
-          >
-            <option value="">Unassigned</option>
-            {(members ?? []).map((member) => (
-              <option key={member.user_id} value={member.user_id}>
-                Member {member.user_id.slice(0, 8)}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Unassigned" },
+              ...(members ?? []).map((member) => ({
+                value: member.user_id,
+                label: "Member " + member.user_id.slice(0, 8),
+              })),
+            ]}
+          />
           <button className="button-primary">Add task</button>
         </form>
       </section>
-      <form
-        action={createTaskLabel}
-        className="mt-4 flex flex-wrap gap-2 border-t pt-4"
-      >
-        <input
-          required
-          name="name"
-          placeholder="New label"
-          className="field-control min-h-0 py-2 text-xs"
-          aria-label="Label name"
-        />
-        <select
-          name="color"
-          defaultValue="indigo"
-          className="field-control min-h-0 py-2 text-xs"
-          aria-label="Label color"
+      <section className="surface mt-4 mb-4 p-5">
+        <div className="toolbar">
+          <div>
+            <p className="eyebrow">Labels</p>
+            <h2 className="mt-1 text-base font-semibold">Manage task labels</h2>
+          </div>
+        </div>
+        <form
+          action={createTaskLabel}
+          className="mt-4 flex flex-wrap items-center gap-2"
         >
-          <option value="indigo">Neutral</option>
-          <option value="blue">Blue</option>
-          <option value="emerald">Emerald</option>
-          <option value="rose">Rose</option>
-          <option value="amber">Amber</option>
-        </select>
-        <button className="button-secondary min-h-0 px-3 py-2 text-xs">
-          Create label
-        </button>
-      </form>
+          <input
+            required
+            name="name"
+            placeholder="New label name"
+            className="field-control min-h-0 py-2 text-xs"
+            aria-label="Label name"
+          />
+          <Select
+            name="color"
+            defaultValue="indigo"
+            options={[
+              { value: "indigo", label: "Neutral" },
+              { value: "blue", label: "Blue" },
+              { value: "emerald", label: "Emerald" },
+              { value: "rose", label: "Rose" },
+              { value: "amber", label: "Amber" },
+            ]}
+          />
+          <button className="button-secondary min-h-0 px-3 py-2 text-xs">
+            Create label
+          </button>
+        </form>
+        {(labels ?? []).length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(labels ?? []).map((label) => (
+              <span
+                key={label.id}
+                className="rounded-full px-2 py-1 text-xs font-semibold bg-[var(--surface-muted)] text-[var(--foreground)]"
+              >
+                {label.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
       <TaskBoard
         tasks={taskRows}
         action={updateTaskStatus}

@@ -181,7 +181,7 @@ export function Sidebar({
           "lifehub-sidebar fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-[var(--line)] bg-[var(--surface)] text-[var(--foreground)] shadow-2xl transition-transform duration-[250ms] md:w-[var(--sidebar-width)] md:translate-x-0 " +
           (mobileOpen ? "translate-x-0" : "-translate-x-full")
         }
-        aria-label="LifeHub sidebar"
+        aria-label="Sanctum Cove sidebar"
       >
         {/* Header */}
         <div className="flex h-[72px] items-center justify-between border-b border-[var(--line)] px-4">
@@ -194,10 +194,10 @@ export function Sidebar({
             className="flex min-w-0 items-center gap-3"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <span className="brand-mark shrink-0">LH</span>
+            <span className="brand-mark shrink-0">SC</span>
             {!collapsed && (
               <span className="truncate text-[18px] font-semibold tracking-tight text-[var(--foreground)]">
-                LifeHub
+                Sanctum Cove
               </span>
             )}
           </Link>

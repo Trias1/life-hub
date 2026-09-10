@@ -13,8 +13,8 @@ export default function Home() {
       <div className="pointer-events-none fixed inset-0 -z-0 bg-[radial-gradient(circle_at_15%_5%,rgba(120,119,198,0.18),transparent_30%),radial-gradient(circle_at_85%_15%,rgba(45,212,191,0.12),transparent_28%)]" />
       <nav className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3 font-semibold tracking-tight">
-          <span className="landing-logo grid h-9 w-9 place-items-center rounded-xl text-xs font-black">LH</span>
-          <span>LifeHub</span>
+          <span className="landing-logo grid h-9 w-9 place-items-center rounded-xl text-xs font-black">SC</span>
+          <span>Sanctum Cove</span>
         </Link>
         <div className="flex items-center gap-3 text-sm">
           <Link href="/login" className="rounded-full px-4 py-2 text-zinc-300 transition hover:bg-white/10 hover:text-white">Sign in</Link>
@@ -31,7 +31,7 @@ export default function Home() {
             Your work and life, finally in one <span className="bg-gradient-to-r from-teal-200 via-white to-violet-300 bg-clip-text text-transparent">clear space.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-400">
-            LifeHub brings your notes, tasks, calendar, files, and people together so you can focus on the next meaningful thing.
+            Sanctum Cove brings your notes, tasks, calendar, files, and people together so you can focus on the next meaningful thing.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link href="/register" className="landing-cta-primary group inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-bold transition hover:-translate-y-0.5">
@@ -65,7 +65,7 @@ export default function Home() {
         <div className="grid gap-4 pt-16 md:grid-cols-3">{features.map(({ icon: Icon, title, text }) => <article key={title} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:-translate-y-1 hover:bg-white/[0.07]"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-teal-200"><Icon size={19} /></div><h2 className="mt-6 text-lg font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-zinc-500">{text}</p></article>)}</div>
       </section>
 
-      <section className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 lg:px-8"><div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] border border-white/10 bg-gradient-to-r from-white/[0.09] to-white/[0.03] p-7 sm:p-10 md:flex-row md:items-center"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200">Start with clarity</p><h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight">Make space for the work that matters.</h2></div><Link href="/register" className="landing-cta-primary inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-3 text-sm font-bold transition">Get started <ArrowRight size={16} /></Link></div><p className="mt-8 text-center text-xs text-zinc-600">© 2026 LifeHub · A focused workspace for work and life.</p></section>
+      <section className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 lg:px-8"><div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] border border-white/10 bg-gradient-to-r from-white/[0.09] to-white/[0.03] p-7 sm:p-10 md:flex-row md:items-center"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200">Start with clarity</p><h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight">Make space for the work that matters.</h2></div><Link href="/register" className="landing-cta-primary inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-3 text-sm font-bold transition">Get started <ArrowRight size={16} /></Link></div><p className="mt-8 text-center text-xs text-zinc-600">© 2026 Sanctum Cove · A focused workspace for work and life.</p></section>
     </main>
   );
 }

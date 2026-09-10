@@ -3,6 +3,17 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { decryptToken, encryptToken } from "@/lib/token-crypto.mjs"
 
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
+export const GOOGLE_ACCOUNT_SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/calendar.readonly"]
+
+export function isGoogleInvalidGrant(error: unknown) {
+  const value = error as { code?: number; response?: { status?: number; data?: { error?: unknown } } }
+  return value.code === 400 && value.response?.status === 400 && value.response?.data?.error === "invalid_grant"
+}
+
+export async function clearWorkspaceDriveConnection(workspaceId: string) {
+  const { error } = await createAdminClient().from("workspace_google_drive_connections").delete().eq("workspace_id", workspaceId)
+  if (error) throw error
+}
 
 function required(name: string) {
   const value = process.env[name]
@@ -66,4 +77,35 @@ export async function saveWorkspaceDriveRoot(workspaceId: string, rootFolderId: 
 
 export async function hasWorkspaceDriveConnection(workspaceId: string) {
   return Boolean((await getWorkspaceDriveConnection(workspaceId))?.refresh_token)
+}
+
+export async function hasGoogleAccountConnection(userId: string) {
+  const { data, error } = await createAdminClient().from("google_oauth_tokens").select("user_id").eq("user_id", userId).maybeSingle()
+  if (error) {
+    if (error.code === "PGRST205") return false
+    throw error
+  }
+  return Boolean(data)
+}
+
+export async function saveGoogleAccountConnection(input: { userId: string; refreshToken: string; scopes: string[] }) {
+  const { error } = await createAdminClient().from("google_oauth_tokens").upsert({ user_id: input.userId, refresh_token: encryptToken(input.refreshToken, tokenSecret()), scopes: input.scopes, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+  if (error) throw error
+}
+
+export async function disconnectGoogleAccount(userId: string) {
+  const admin = createAdminClient()
+  const { data } = await admin.from("google_oauth_tokens").select("refresh_token").eq("user_id", userId).maybeSingle()
+  if (data?.refresh_token) {
+    try {
+      await createGoogleOAuthClient().revokeToken(decryptToken(data.refresh_token, tokenSecret()))
+    } catch (error) {
+      const value = error as { response?: { status?: number; data?: { error?: unknown } }; code?: number }
+      const status = value.response?.status ?? value.code
+      const errorCode = value.response?.data?.error
+      if (!(status === 400 && (errorCode === "invalid_token" || errorCode === "invalid_grant"))) throw error
+    }
+  }
+  const { error } = await admin.from("google_oauth_tokens").delete().eq("user_id", userId)
+  if (error) throw error
 }

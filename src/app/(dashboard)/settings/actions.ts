@@ -7,7 +7,7 @@ import { actionFailure } from "@/lib/actions/server"
 import { getStorageForWorkspace } from "@/lib/storage/storage"
 import { getWorkspaceContext } from "@/lib/workspace/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { disconnectWorkspaceDriveConnection } from "@/lib/google-drive-auth"
+import { disconnectWorkspaceDriveConnection, disconnectGoogleAccount } from "@/lib/google-drive-auth"
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(80),
@@ -58,7 +58,7 @@ export async function uploadProfileAvatar(formData: FormData): Promise<void> {
   if (!context) actionFailure(returnPath, "access the active workspace")
   const storage = getStorageForWorkspace(context.workspaceId)
 
-  const { data: existingProfile, error: existingProfileError } = await context.supabase.from("profiles").select("avatar_url,avatar_google_file_id").eq("id", context.user.id).maybeSingle()
+  const { data: existingProfile, error: existingProfileError } = await context.supabase.from("profiles").select("avatar_url,avatar_google_file_id,avatar_workspace_id").eq("id", context.user.id).maybeSingle()
   if (existingProfileError) actionFailure(returnPath, "load profile", existingProfileError)
 
   let uploaded: Awaited<ReturnType<typeof storage.upload>>
@@ -69,21 +69,21 @@ export async function uploadProfileAvatar(formData: FormData): Promise<void> {
     actionFailure(returnPath, "upload profile photo", storageError(error))
   }
 
-  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, avatar_url: "google-drive:" + uploaded.id, avatar_google_file_id: uploaded.id, updated_at: new Date().toISOString() })
+  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, avatar_url: "google-drive:" + uploaded.id, avatar_google_file_id: uploaded.id, avatar_workspace_id: context.workspaceId, updated_at: new Date().toISOString() })
   if (error) {
     try {
       await storage.delete(uploaded.id)
     } catch (rollbackError) {
-      console.error("Could not remove orphaned Google Drive avatar", rollbackError)
+      console.error("Could not remove orphaned Google Drive avatar")
     }
     actionFailure(returnPath, "save profile photo", error)
   }
 
   if (existingProfile?.avatar_google_file_id) {
     try {
-      await storage.delete(existingProfile.avatar_google_file_id)
+      await getStorageForWorkspace(existingProfile.avatar_workspace_id ?? context.workspaceId).delete(existingProfile.avatar_google_file_id)
     } catch (cleanupError) {
-      console.error("Could not remove previous Google Drive avatar", cleanupError)
+      console.error("Could not remove previous Google Drive avatar")
     }
   }
 
@@ -144,4 +144,16 @@ export async function saveNotificationPreferences(formData: FormData): Promise<v
   const { error } = await context.supabase.from("notification_preferences").upsert({ user_id: context.user.id, mentions_enabled: input.data.mentionsEnabled, tasks_enabled: input.data.tasksEnabled, calendar_enabled: input.data.calendarEnabled, notes_enabled: input.data.notesEnabled, files_enabled: input.data.filesEnabled, bookmarks_enabled: input.data.bookmarksEnabled, updated_at: new Date().toISOString() })
   if (error) actionFailure("/settings", "save notification preferences", error)
   revalidatePath("/settings")
+}
+
+export async function disconnectGoogleAccountAction(): Promise<void> {
+  const context = await getWorkspaceContext()
+  if (!context) actionFailure("/profile", "disconnect Google")
+  try {
+    await disconnectGoogleAccount(context.user.id)
+  } catch (error) {
+    actionFailure("/profile", "disconnect Google", error instanceof Error ? error : null)
+  }
+  revalidatePath("/profile")
+  redirect("/profile?google=disconnected")
 }

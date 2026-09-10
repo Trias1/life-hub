@@ -19,8 +19,8 @@ function escapeQuery(value: string) {
 }
 
 function logDriveError(operation: string, error: unknown) {
-  const value = error as { message?: string; stack?: string; errors?: unknown; response?: { status?: number; data?: unknown } }
-  console.error("[google-drive] " + operation, { message: value.message, stack: value.stack, status: value.response?.status, responseData: value.response?.data, errors: value.errors })
+  const value = error as { message?: string; response?: { status?: number; data?: { error?: unknown; error_description?: unknown } }; code?: number }
+  console.error("[google-drive] " + operation, { status: value.response?.status ?? value.code, errorCode: value.response?.data?.error })
 }
 
 function serviceAccountClient() {
@@ -48,10 +48,8 @@ async function findFolder(drive: Drive, name: string, parentId?: string) {
 }
 
 async function createFolderWithDrive(drive: Drive, name: string, parentId?: string) {
-  console.log("[google-drive] create folder", { name, parentId: parentId ?? null })
   try {
     const response = await drive.files.create({ requestBody: { name, mimeType: FOLDER_MIME, ...(parentId ? { parents: [parentId] } : {}) }, fields: "id,name,mimeType,size,webViewLink,parents,driveId", supportsAllDrives: true })
-    console.log("[google-drive] create folder response", response.data)
     return objectFromFile(response.data)
   } catch (error) {
     logDriveError("create folder failed", error)
@@ -104,11 +102,9 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     const body = Buffer.isBuffer(input.body) ? input.body : Buffer.from(input.body)
     if (body.byteLength === 0) throw new Error("Cannot upload an empty file")
     const stream = Readable.from([body])
-    console.log("[google-drive] upload input", { name: input.name, mimeType: input.mimeType, sizeBytes: input.sizeBytes, bufferBytes: body.byteLength, parentId: input.parentId, streamReadable: stream instanceof Readable })
     try {
       const { drive } = await driveForRequest()
       const response = await drive.files.create({ requestBody: { name: input.name, mimeType: input.mimeType, parents: [input.parentId] }, media: { mimeType: input.mimeType, body: stream }, fields: "id,name,mimeType,size,webViewLink,parents,driveId", supportsAllDrives: true })
-      console.log("[google-drive] upload response", response.data)
       return objectFromFile({ ...response.data, size: response.data.size ?? String(input.sizeBytes) })
     } catch (error) {
       logDriveError("upload failed", error)

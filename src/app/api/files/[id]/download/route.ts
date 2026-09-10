@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const download = await storage.download(file.google_file_id)
     return new NextResponse(Readable.toWeb(download.body) as ReadableStream, { headers: { "Content-Type": download.mimeType || file.mime_type, "Content-Length": String(download.sizeBytes || file.size_bytes), "Content-Disposition": (new URL(request.url).searchParams.get("inline") === "1" ? "inline" : "attachment") + "; filename*=UTF-8''" + encodeURIComponent(download.name || file.name), "Cache-Control": "private, no-store" } })
   } catch (downloadError) {
-    console.error("download file", downloadError)
+    console.error("download file")
     return NextResponse.json({ error: "Could not download file" }, { status: 502 })
   }
 }

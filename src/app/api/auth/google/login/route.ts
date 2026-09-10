@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     response.cookies.set("lifehub_google_oauth_state", state, { httpOnly: true, sameSite: "lax", secure: request.nextUrl.protocol === "https:", maxAge: 600, path: "/" })
     return response
   } catch (error) {
-    console.error("google oauth login", error)
+    console.error("google oauth login", error instanceof Error ? error.message : "unknown error")
     return new Response("OAuth configuration is missing", { status: 500 })
   }
 }

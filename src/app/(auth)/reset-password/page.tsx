@@ -55,8 +55,8 @@ export default function ResetPasswordPage() {
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <section className="surface w-full max-w-md p-6 sm:p-8">
         <div className="flex items-center gap-3">
-          <span className="brand-mark">LH</span>
-          <p className="font-semibold">LifeHub</p>
+          <span className="brand-mark">SC</span>
+          <p className="font-semibold">Sanctum Cove</p>
         </div>
         <div className="mt-10">
           <p className="eyebrow">Account recovery</p>

@@ -114,7 +114,7 @@ function pageMeta(pathname: string) {
   if (pathname.startsWith("/profile"))
     return {
       title: "Profile",
-      description: "Your LifeHub identity.",
+      description: "Your Sanctum Cove identity.",
       action: "",
       href: "",
     };

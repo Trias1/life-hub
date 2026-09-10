@@ -11,7 +11,7 @@ export default async function SettingsPage() {
     context.supabase.from("workspace_settings").select("language,timezone,date_format,time_format").eq("workspace_id", context.workspaceId).maybeSingle(),
     context.supabase.from("notification_preferences").select("mentions_enabled,tasks_enabled,calendar_enabled,notes_enabled,files_enabled,bookmarks_enabled").eq("user_id", context.user.id).maybeSingle(),
     hasWorkspaceDriveConnection(context.workspaceId).catch((error) => {
-      console.error("load Google Drive connection", error)
+      console.error("load Google Drive connection")
       return false
     }),
   ])

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"

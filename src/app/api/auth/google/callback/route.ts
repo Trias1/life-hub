@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("lifehub_google_oauth_state")
     return response
   } catch (error) {
-    console.error("google oauth callback", error)
+    console.error("google oauth callback", error instanceof Error ? error.message : "unknown error")
     return NextResponse.redirect(new URL("/settings?error=Could+not+connect+Google+Drive", request.url))
   }
 }

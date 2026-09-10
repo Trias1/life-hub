@@ -9,7 +9,6 @@
   --surface: #0a0a0a;
   --surface-muted: #171717;
   --accent: #2d3139;
-  /* ← naikin dari #1e2028 */
   --accent-hover: #3d4249;
   --on-accent: #ffffff;
   --radius-card: 1rem;
@@ -80,8 +79,8 @@ button:disabled {
   height: 2rem;
   place-items: center;
   border-radius: 0.75rem;
-  background: #17191f;
-  color: white;
+  background: transparent;
+  color: var(--foreground);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -153,8 +152,10 @@ button:disabled {
 }
 
 .metric-card {
-  min-height: 8.5rem;
+  height: 8.5rem;
+  min-height: unset;
   padding: 1.25rem;
+  overflow: hidden;
 }
 
 .metric-label {
@@ -249,7 +250,7 @@ button:disabled {
 }
 
 .empty-state {
-  border: 1px dashed #cfd4dc;
+  border: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
   border-radius: 1rem;
   padding: 2.5rem 1.5rem;
   text-align: center;
@@ -267,6 +268,22 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1279px) {
+  .customize-preview {
+    position: static;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 767px) {
   .page-container {
     padding: 1.25rem 1rem 2rem;
@@ -278,9 +295,45 @@ button:disabled {
 
   .metric-grid,
   .card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-card {
+    height: 7rem;
+    padding: 1rem;
+  }
+
+  .task-board-kanban {
+    grid-template-columns: repeat(4, 260px);
+  }
+
+  .task-drawer {
+    width: 100vw;
+  }
+
+  .settings-panel {
+    min-height: 0;
+    padding: 1.25rem;
+  }
+
+  .profile-tabs {
+    top: 60px;
+  }
+
+  .profile-banner {
+    height: 7rem;
   }
 }
+
+@media (max-width: 480px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ============================================
+   SIDEBAR
+   ============================================ */
 
 .sidebar-menu-item {
   display: flex;
@@ -297,6 +350,10 @@ button:disabled {
   background: var(--surface-muted);
   color: var(--foreground);
 }
+
+/* ============================================
+   TOP NAVBAR
+   ============================================ */
 
 .top-navbar {
   background: color-mix(in srgb, var(--background) 90%, transparent);
@@ -336,6 +393,10 @@ button:disabled {
   background: var(--surface-muted);
   color: var(--foreground);
 }
+
+/* ============================================
+   THEME OVERRIDES
+   ============================================ */
 
 html[data-theme="dark"] .text-zinc-300 {
   color: #d1d5db;
@@ -380,7 +441,8 @@ html[data-density="compact"] .page-container {
 }
 
 html[data-density="compact"] .metric-card {
-  min-height: 7rem;
+  height: 7rem;
+  min-height: unset;
   padding: 1rem;
 }
 
@@ -491,6 +553,10 @@ html[data-widget-storage="false"] [data-dashboard-widget="storage"] {
   display: none;
 }
 
+/* ============================================
+   SETTINGS
+   ============================================ */
+
 .settings-nav {
   display: grid;
   gap: 0.15rem;
@@ -533,6 +599,10 @@ html[data-widget-storage="false"] [data-dashboard-widget="storage"] {
   border-top: 1px solid var(--line);
   padding-top: 1rem;
 }
+
+/* ============================================
+   PROFILE
+   ============================================ */
 
 .profile-hero {
   overflow: hidden;
@@ -621,6 +691,10 @@ html[data-widget-storage="false"] [data-dashboard-widget="storage"] {
   padding: 1rem;
 }
 
+/* ============================================
+   CUSTOMIZE
+   ============================================ */
+
 .customize-section {
   border-bottom: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
   padding-bottom: 1.75rem;
@@ -689,26 +763,9 @@ html[data-widget-storage="false"] [data-dashboard-widget="storage"] {
   background: color-mix(in srgb, var(--surface-muted) 78%, transparent);
 }
 
-@media (max-width: 1279px) {
-  .customize-preview {
-    position: static;
-  }
-}
-
-@media (max-width: 767px) {
-  .settings-panel {
-    min-height: 0;
-    padding: 1.25rem;
-  }
-
-  .profile-tabs {
-    top: 60px;
-  }
-
-  .profile-banner {
-    height: 7rem;
-  }
-}
+/* ============================================
+   DASHBOARD LOADING
+   ============================================ */
 
 .dashboard-loading {
   opacity: 0;
@@ -733,10 +790,18 @@ html[data-motion="off"] .dashboard-loading {
   }
 }
 
+/* ============================================
+   FORM FOCUS
+   ============================================ */
+
 html[data-theme="dark"] .field-control:focus {
   border-color: #737373;
   box-shadow: 0 0 0 3px rgb(255 255 255 / 0.12);
 }
+
+/* ============================================
+   LANDING
+   ============================================ */
 
 .landing-cta-primary {
   background: #ffffff !important;
@@ -751,15 +816,14 @@ html[data-theme="dark"] .field-control:focus {
 }
 
 .landing-logo {
-  background: #ffffff !important;
-  color: #09090b !important;
+  background: transparent !important;
+  color: #ffffff !important;
 }
 
 /* ============================================
    WORKSPACE SWITCH CURRENT - LIGHT & DARK FIX
    ============================================ */
 
-/* Dark mode default */
 .workspace-switch-current {
   background-color: var(--foreground) !important;
   color: var(--background) !important;
@@ -776,7 +840,6 @@ html[data-theme="dark"] .field-control:focus {
   border: 1px solid var(--line) !important;
 }
 
-/* Light mode */
 html[data-theme="light"] .lifehub-sidebar .workspace-switch-current {
   background-color: var(--surface-muted) !important;
   color: var(--foreground) !important;
@@ -793,6 +856,10 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
   color: var(--surface) !important;
   border: none !important;
 }
+
+/* ============================================
+   DATE TIME PICKER
+   ============================================ */
 
 .date-time-picker {
   position: relative;
@@ -919,7 +986,14 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
   opacity: 0.4;
 }
 
-/* SELECT */
+.date-time-picker.date-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ============================================
+   SELECT
+   ============================================ */
+
 .custom-select-trigger {
   display: inline-flex;
   min-height: 2.6rem;
@@ -985,15 +1059,14 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
   align-items: center;
 }
 
-.date-time-picker.date-only {
-  grid-template-columns: minmax(0, 1fr);
-}
+/* ============================================
+   TASK BOARD
+   ============================================ */
 
 .task-board-kanban {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: 1rem;
-  min-width: calc(4 * 280px + 3 * 1rem);
   min-height: calc(100vh - 12rem);
   overflow-x: auto;
   padding-bottom: 0.5rem;
@@ -1008,6 +1081,8 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
 
 .task-board-column-tasks {
   min-height: 8rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .task-board-card {
@@ -1017,12 +1092,10 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
   box-sizing: border-box;
 }
 
-.task-board-column-tasks {
-  min-width: 0;
-  overflow: hidden;
-}
+/* ============================================
+   TASK DRAWER
+   ============================================ */
 
-/* TASK DRAWER */
 .task-drawer-backdrop {
   position: fixed;
   inset: 0;
@@ -1081,15 +1154,11 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
   from {
     transform: translateX(100%);
   }
-
   to {
     transform: translateX(0);
   }
 }
 
-@media (max-width: 480px) {
-  .task-drawer {
-    width: 100vw;
-  }
+.task-board-column-cancelled {
+  grid-column: 1;
 }
-.task-board-column-cancelled { grid-column: 1; }
