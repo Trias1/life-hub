@@ -226,7 +226,7 @@ export function Sidebar({
                   <p className="truncate px-2 py-1 text-[11px] text-[var(--muted)]">{user.email}</p>
                   <div className="my-1 border-t border-[var(--line)]" />
                   {workspaces.map((ws) => (
-                    <form key={ws.id} action={selectWorkspace}>
+                    <form key={ws.id} action={selectWorkspace} onSubmit={() => { window.setTimeout(() => window.location.reload(), 1500) }}>
                       <input type="hidden" name="workspaceId" value={ws.id} />
                       <button className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (ws.id === workspace.id ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]")}>
                         <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{ws.name.slice(0, 1).toUpperCase()}</span>
