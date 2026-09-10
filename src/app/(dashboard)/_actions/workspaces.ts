@@ -12,6 +12,7 @@ export async function selectWorkspace(formData: FormData): Promise<void> {
   const result = await setActiveWorkspace(input.data.workspaceId)
   if (result.error) actionFailure("/dashboard", "switch workspace")
   revalidatePath("/dashboard")
+  revalidatePath("/dashboard", "layout")
   revalidatePath("/notes")
   revalidatePath("/tasks")
   revalidatePath("/calendar")
