@@ -1,15 +1,21 @@
 "use client"
 
 import * as SelectPrimitive from "@radix-ui/react-select"
+import { useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 
 type SelectOption = { value: string; label: string }
 type SelectProps = { name?: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; options: SelectOption[]; placeholder?: string; id?: string; className?: string; required?: boolean }
 
 export function Select({ name, defaultValue, value, onChange, options, placeholder = "Select an option", id, className, required = false }: SelectProps) {
-  const selectedValue = value ?? defaultValue ?? ""
+  const [internalValue, setInternalValue] = useState(defaultValue ?? "")
+  const selectedValue = value ?? internalValue
+  const handleValueChange = (nextValue: string) => {
+    if (value === undefined) setInternalValue(nextValue)
+    onChange?.(nextValue)
+  }
   return (
-    <SelectPrimitive.Root value={value} defaultValue={value === undefined ? defaultValue : undefined} onValueChange={onChange}>
+    <SelectPrimitive.Root value={value} defaultValue={value === undefined ? defaultValue : undefined} onValueChange={handleValueChange}>
       {name && <input type="hidden" id={id} name={name} value={selectedValue} required={required} />}
       <SelectPrimitive.Trigger id={id} className={"custom-select-trigger" + (className ? " " + className : "")} aria-label={name}>
         <SelectPrimitive.Value placeholder={placeholder} />
