@@ -32,6 +32,7 @@ export interface StorageService {
   ensureFolder(path: string[]): Promise<string>
   getUsage(): Promise<StorageUsage>
   upload(input: StorageUploadInput): Promise<StoredObject>
+  makePublic(fileId: string): Promise<void>
   download(fileId: string): Promise<StorageDownload>
   delete(fileId: string): Promise<void>
   rename(fileId: string, name: string): Promise<StoredObject>

@@ -78,6 +78,7 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
   const [due, setDue] = useState<DueFilter>("all")
   const [view, setView] = useState<"board" | "list">("board")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
+  const [taskStatuses, setTaskStatuses] = useState<Record<string, TaskStatus>>(() => Object.fromEntries(tasks.map((task) => [task.id, task.status])))
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null)
   const today = dateKey(new Date())
   const assignees = useMemo(() => [...new Set(tasks.map((task) => task.assignee_id).filter((id): id is string => Boolean(id)))], [tasks])
@@ -111,18 +112,18 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
   const editor = (task: Task) => (
     <form id={`task-form-${task.id}`} action={action} onClick={(event) => event.stopPropagation()} className="mt-4 flex items-center gap-2">
       <input type="hidden" name="id" value={task.id} />
+      <input type="hidden" name="status" value={taskStatuses[task.id] ?? task.status} />
       <label className="sr-only" htmlFor={`status-${task.id}`}>Status for {task.title}</label>
-      <Select id={`status-${task.id}`} name="status" defaultValue={task.status} className="field-control min-h-0 py-2 text-xs" options={columns.map(([value, label]) => ({ value, label }))} />
+      <Select id={`status-${task.id}`} name="status" value={taskStatuses[task.id] ?? task.status} onChange={(value) => setTaskStatuses((previous) => ({ ...previous, [task.id]: value as TaskStatus }))} className="field-control min-h-0 py-2 text-xs" options={columns.map(([value, label]) => ({ value, label }))} />
       <button className="button-quiet min-h-0 px-2 py-1 text-xs">Save</button>
     </form>
   )
   const moveTask = (nextStatus: TaskStatus) => {
     if (!draggedTask) return
+    setTaskStatuses((previous) => ({ ...previous, [draggedTask]: nextStatus }))
     const form = document.getElementById(`task-form-${draggedTask}`) as HTMLFormElement | null
-    const select = form?.elements.namedItem("status") as HTMLSelectElement | null
-    if (!form || !select) return
-    select.value = nextStatus
-    form.requestSubmit()
+    if (!form) return
+    window.setTimeout(() => form.requestSubmit(), 0)
     setDraggedTask(null)
   }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { DateTimePicker } from "@/components/date-time-picker"
 import { Select } from "@/components/ui/select"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 type CalendarEvent = { id: string; source_id: string; occurrence_index: number; title: string; description: string; starts_at: string; ends_at: string; recurrence_rule: string | null; color: string; reminder_minutes: number | null; creator_id?: string }
 type CalendarAttendee = { id: string; event_id: string; user_id: string | null; email: string | null; response: string }
@@ -22,6 +23,10 @@ function attendeeLabel(attendee: CalendarAttendee) {
 
 export function CalendarBoard({ events, attendees, members, currentUserId, currentUserEmail, updateEvent, deleteEvent, addEventAttendee, removeEventAttendee, respondEventAttendee }: Props) {
   const [view, setView] = useState<CalendarView>("agenda")
+  const [displayDate, setDisplayDate] = useState(() => new Date())
+  const prevMonth = () => setDisplayDate((previous) => new Date(previous.getFullYear(), previous.getMonth() - 1, 1))
+  const nextMonth = () => setDisplayDate((previous) => new Date(previous.getFullYear(), previous.getMonth() + 1, 1))
+  const goToToday = () => setDisplayDate(new Date())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const today = useMemo(() => new Date(), [])
   const selected = events.find((event) => event.id === selectedId)
@@ -29,13 +34,13 @@ export function CalendarBoard({ events, attendees, members, currentUserId, curre
   const selectedAttendees = attendees.filter((attendee) => attendee.event_id === selectedSourceId)
   const canManageAttendees = selected?.creator_id === currentUserId
   const monthDays = useMemo(() => {
-    const start = new Date(today.getFullYear(), today.getMonth(), 1)
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    const start = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
+    const end = new Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 0)
     const days = []
     for (let index = 1; index <= end.getDate(); index += 1)
-      days.push(new Date(today.getFullYear(), today.getMonth(), index))
+      days.push(new Date(displayDate.getFullYear(), displayDate.getMonth(), index))
     return { start, days }
-  }, [today])
+  }, [displayDate])
   const eventsForDay = (date: Date) => events.filter((event) => new Date(event.starts_at).toDateString() === date.toDateString())
   const eventCard = (event: CalendarEvent) => (
     <button
@@ -61,10 +66,11 @@ export function CalendarBoard({ events, attendees, members, currentUserId, curre
       {/* Toolbar */}
       <div className="toolbar mb-4">
         <div>
-          <p className="eyebrow">{today.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</p>
+          <p className="eyebrow">{displayDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</p>
           <h2 className="mt-1 text-lg font-semibold">Your schedule</h2>
         </div>
-        <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--surface-muted)] p-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--surface-muted)] p-1">
           {(["agenda", "month", "week", "day"] as CalendarView[]).map((item) => (
             <button
               key={item}
@@ -75,6 +81,14 @@ export function CalendarBoard({ events, attendees, members, currentUserId, curre
               {item}
             </button>
           ))}
+          </div>
+          {view === "month" && (
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={prevMonth} className="button-secondary min-h-0 p-2" aria-label="Previous month"><ChevronLeft size={16} /></button>
+              <button type="button" onClick={goToToday} className="button-secondary min-h-0 px-3 py-1.5 text-xs">Today</button>
+              <button type="button" onClick={nextMonth} className="button-secondary min-h-0 p-2" aria-label="Next month"><ChevronRight size={16} /></button>
+            </div>
+          )}
         </div>
       </div>
 

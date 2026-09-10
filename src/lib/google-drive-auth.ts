@@ -109,3 +109,26 @@ export async function disconnectGoogleAccount(userId: string) {
   const { error } = await admin.from("google_oauth_tokens").delete().eq("user_id", userId)
   if (error) throw error
 }
+
+export type GoogleCalendarEvent = { id: string; title: string; description: string; startsAt: string; endsAt: string; htmlLink: string | null }
+
+export async function getGoogleCalendarEvents(userId: string, timeMin = new Date(), days = 90): Promise<GoogleCalendarEvent[]> {
+  const { data, error } = await createAdminClient().from("google_oauth_tokens").select("refresh_token,scopes").eq("user_id", userId).maybeSingle()
+  if (error || !data?.refresh_token) return []
+  if (!data.scopes?.includes("https://www.googleapis.com/auth/calendar.readonly")) return []
+  const auth = createGoogleOAuthClient()
+  auth.setCredentials({ refresh_token: decryptToken(data.refresh_token, tokenSecret()) })
+  const calendar = google.calendar({ version: "v3", auth })
+  const timeMax = new Date(timeMin.getTime() + days * 24 * 60 * 60 * 1000)
+  try {
+    const response = await calendar.events.list({ calendarId: "primary", timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: true, orderBy: "startTime", maxResults: 100 })
+    return (response.data.items ?? []).flatMap((event) => {
+      const start = event.start?.dateTime ?? (event.start?.date ? new Date(event.start.date + "T00:00:00").toISOString() : null)
+      const end = event.end?.dateTime ?? (event.end?.date ? new Date(event.end.date + "T00:00:00").toISOString() : null)
+      return event.id && start && end ? [{ id: event.id, title: event.summary ?? "Untitled event", description: event.description ?? "", startsAt: start, endsAt: end, htmlLink: event.htmlLink ?? null }] : []
+    })
+  } catch (error) {
+    console.error("Could not load Google Calendar events", error instanceof Error ? error.message : "request failed")
+    return []
+  }
+}

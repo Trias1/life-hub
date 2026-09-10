@@ -127,10 +127,11 @@ export default async function NotesPage({
             </div>
             <span className="text-xs text-zinc-400">Markdown-friendly</span>
           </div>
-          <NoteComposer action={createNote} />
+          <NoteComposer action={createNote} workspaceId={context.workspaceId} />
         </section>
       )}
       <NotesWorkspace
+        workspaceId={context.workspaceId}
         notes={notes ?? []}
         versions={versions ?? []}
         selectedNoteId={note}

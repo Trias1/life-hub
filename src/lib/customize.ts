@@ -28,17 +28,27 @@ const sidebarModes = new Set<SidebarMode>(["expanded", "compact", "icon", "float
 const fontSizes = new Set<FontSize>(["small", "medium", "large"])
 const fontFamilies = new Set<FontFamily>(["geist", "inter", "manrope"])
 
+export function accentForTheme(theme: "light" | "dark") {
+  if (typeof window === "undefined") return theme === "light" ? "gray" as Accent : "indigo" as Accent
+  const stored = window.localStorage.getItem(`sanctumcove:accent-${theme}`)
+  return stored && stored in accents ? stored as Accent : theme === "light" ? "gray" : "indigo"
+}
+
 export function readCustomizePreferences(): CustomizePreferences {
   if (typeof window === "undefined") return { ...defaultCustomizePreferences, widgets: { ...defaultCustomizePreferences.widgets } }
   try {
     const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as Partial<CustomizePreferences>
-    const accent = stored.accent && stored.accent in accents ? stored.accent : defaultCustomizePreferences.accent
+    const theme = stored.theme && themes.has(stored.theme) ? stored.theme : defaultCustomizePreferences.theme
+    const resolvedTheme = theme === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme
+    const legacyAccent = stored.accent && stored.accent in accents ? stored.accent as Accent : undefined
+    const accent = accentForTheme(resolvedTheme) ?? legacyAccent ?? (resolvedTheme === "light" ? "gray" : "indigo")
+    window.localStorage.setItem(`sanctumcove:accent-${resolvedTheme}`, accent)
     const radius = typeof stored.radius === "number" && stored.radius >= 8 && stored.radius <= 24 ? stored.radius : defaultCustomizePreferences.radius
     const widgets = { ...defaultCustomizePreferences.widgets, ...(stored.widgets && typeof stored.widgets === "object" ? stored.widgets : {}) }
     return {
       accent, radius, widgets: Object.fromEntries(Object.entries(widgets).map(([key, value]) => [key, Boolean(value)])) as DashboardWidgets,
       density: stored.density === "compact" ? "compact" : defaultCustomizePreferences.density,
-      theme: stored.theme && themes.has(stored.theme) ? stored.theme : defaultCustomizePreferences.theme,
+      theme,
       sidebarMode: stored.sidebarMode && sidebarModes.has(stored.sidebarMode) ? stored.sidebarMode : defaultCustomizePreferences.sidebarMode,
       fontSize: stored.fontSize && fontSizes.has(stored.fontSize) ? stored.fontSize : defaultCustomizePreferences.fontSize,
       fontFamily: stored.fontFamily && fontFamilies.has(stored.fontFamily) ? stored.fontFamily : defaultCustomizePreferences.fontFamily,
@@ -55,8 +65,10 @@ export function readCustomizePreferences(): CustomizePreferences {
 
 export function applyCustomizePreferences(preferences: CustomizePreferences) {
   const root = document.documentElement
-  const accent = accents[preferences.accent]
   const resolvedTheme = preferences.theme === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : preferences.theme
+  const accentName = accentForTheme(resolvedTheme) === preferences.accent ? preferences.accent : preferences.accent
+  const accent = accents[accentName]
+  window.localStorage.setItem(`sanctumcove:accent-${resolvedTheme}`, accentName)
   const fontFamilies: Record<FontFamily, string> = { geist: "var(--font-geist-sans)", inter: "var(--font-inter)", manrope: "var(--font-manrope)" }
   root.dataset.theme = resolvedTheme
   root.dataset.density = preferences.density

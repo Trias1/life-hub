@@ -112,6 +112,11 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     }
   }
 
+  async function makePublic(fileId: string) {
+    const { drive } = await driveForRequest()
+    await drive.permissions.create({ fileId, requestBody: { type: "anyone", role: "reader" }, supportsAllDrives: true })
+  }
+
   async function download(fileId: string): Promise<StorageDownload> {
     const { drive } = await driveForRequest()
     const metadata = await drive.files.get({ fileId, fields: "id,name,mimeType,size", supportsAllDrives: true })
@@ -160,7 +165,7 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     return (response.data.files ?? []).map(objectFromFile)
   }
 
-  return { ensureFolder, getUsage, upload, download, delete: remove, rename, move, copy, createFolder, list, get }
+  return { ensureFolder, getUsage, upload, makePublic, download, delete: remove, rename, move, copy, createFolder, list, get }
 }
 
 export const legacyGoogleDriveStorage = googleDriveStorage()

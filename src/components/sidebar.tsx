@@ -8,7 +8,7 @@ import {
   Archive,
   Bookmark,
   CalendarDays,
-  ChevronDown,
+  Check,
   ClipboardList,
   Folder,
   LayoutDashboard,
@@ -109,7 +109,6 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -120,6 +119,12 @@ export function Sidebar({
     name: string;
     color: string;
   } | null>(null);
+
+  const closeAll = () => {
+    setProfileOpen(false);
+    setMobileOpen(false);
+    setSpaceMenuId(null);
+  };
 
   const toggleCollapsed = () =>
     setCollapsed((value) => {
@@ -178,7 +183,7 @@ export function Sidebar({
     <>
       <aside
         className={
-          "lifehub-sidebar fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-[var(--line)] bg-[var(--surface)] text-[var(--foreground)] shadow-2xl transition-transform duration-[250ms] md:w-[var(--sidebar-width)] md:translate-x-0 " +
+          "lifehub-sidebar fixed inset-y-0 left-0 z-40 flex w-[min(280px,75vw)] flex-col md:w-[var(--sidebar-width)] md:max-w-none border-r border-[var(--line)] bg-[var(--surface)] text-[var(--foreground)] shadow-2xl transition-transform duration-[250ms] md:translate-x-0 " +
           (mobileOpen ? "translate-x-0" : "-translate-x-full")
         }
         aria-label="Sanctum Cove sidebar"
@@ -211,117 +216,24 @@ export function Sidebar({
           </button>
         </div>
 
+        {!collapsed && (
+          <div className="px-3 pb-1 pt-3">
+            <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("lifehub:open-search"))}
+            className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
+          >
+            <Search size={15} />
+            <span className="flex-1 text-left">Search...</span>
+            <kbd className="rounded border border-[var(--line)] px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+            </button>
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          {!collapsed && (
-            <>
-              {/* Workspace switcher button */}
-              <button
-                type="button"
-                onClick={() => setWorkspaceOpen(!workspaceOpen)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-3 text-left transition hover:bg-[var(--line)]"
-                aria-expanded={workspaceOpen}
-                aria-label="Workspace switcher"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--accent)] text-sm font-bold text-[var(--on-accent)]">
-                  {workspace.name.slice(0, 1).toUpperCase()}
-                </span>
-                {!collapsed && (
-                  <>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-[var(--foreground)]">
-                        {workspace.name}
-                      </span>
-                    </span>
-                    <ChevronDown size={16} className="text-[var(--muted)]" />
-                  </>
-                )}
-              </button>
-
-              {/* Workspace dropdown */}
-              {workspaceOpen && (
-                <div className="relative z-20 mt-2 space-y-1 rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] p-2 text-sm shadow-xl">
-                  <p className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    Switch workspace
-                  </p>
-                  <Link href="/onboarding" className="sidebar-menu-item">
-                    Create Workspace
-                  </Link>
-                  <p className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    List of workspaces
-                  </p>
-                  {workspaces.length ? (
-                    workspaces.map((item) => (
-                      <form key={item.id} action={selectWorkspace}>
-                        <input
-                          type="hidden"
-                          name="workspaceId"
-                          value={item.id}
-                        />
-                        <button
-                          className={
-                            "sidebar-menu-item workspace-switch-item w-full " +
-                            (item.id === workspace.id
-                              ? "workspace-switch-current"
-                              : "")
-                          }
-                        >
-                          <span className="truncate">{item.name}</span>
-                          {item.id === workspace.id && (
-                            <span className="workspace-switch-current-label ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                              Current
-                            </span>
-                          )}
-                        </button>
-                      </form>
-                    ))
-                  ) : (
-                    <p className="px-3 py-2 text-[var(--muted)]">
-                      No other workspaces yet.
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Search */}
-          {!collapsed && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchOpen(!searchOpen);
-                setQuery("");
-              }}
-              className="mt-4 flex w-full items-center gap-3 rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
-              aria-expanded={searchOpen}
-            >
-              <Search size={16} />
-              <span>Search</span>
-              <kbd className="ml-auto rounded border border-[var(--line)] px-1.5 py-0.5 text-[10px]">
-                Ctrl K
-              </kbd>
-            </button>
-          )}
-
-          {searchOpen && !collapsed && (
-            <div className="mt-2">
-              <label className="sr-only" htmlFor="sidebar-search">
-                Search navigation
-              </label>
-              <input
-                id="sidebar-search"
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search navigation"
-                className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--accent)]"
-              />
-            </div>
-          )}
-
           {/* Nav */}
-          <nav aria-label="Main navigation" className="mt-5 space-y-1">
+          <nav aria-label="Main navigation" className="mt-1 space-y-1">
             {filteredNavigation.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(item.href + "/");
@@ -448,12 +360,12 @@ export function Sidebar({
                 (collapsed ? "left-3" : "left-3 right-3")
               }
             >
-              <Link href="/profile" className="sidebar-menu-item">My Profile</Link>
-              <Link href="/settings" className="sidebar-menu-item">Settings</Link>
-              <Link href="/customize" className="sidebar-menu-item">Appearance</Link>
+              <Link href="/profile" className="sidebar-menu-item" onClick={closeAll}>My Profile</Link>
+              <Link href="/settings" className="sidebar-menu-item" onClick={closeAll}>Settings</Link>
+              <Link href="/customize" className="sidebar-menu-item" onClick={closeAll}>Appearance</Link>
               <button
                 type="button"
-                onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }))}
+                onClick={() => { closeAll(); window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" })) }}
                 className="sidebar-menu-item"
               >
                 Keyboard Shortcuts
@@ -466,43 +378,37 @@ export function Sidebar({
             </div>
           )}
         </div>
+
+        {/* Account & workspace panel */}
+        {!collapsed && (
+          <div className="space-y-0.5 border-t border-[var(--line)] px-3 py-2">
+            <p className="truncate px-2 py-1 text-[11px] text-[var(--muted)]">{user.email}</p>
+            {workspaces.map((ws) => (
+              <form key={ws.id} action={selectWorkspace}>
+                <input type="hidden" name="workspaceId" value={ws.id} />
+                <button className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (ws.id === workspace.id ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]")}>
+                  <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{ws.name.slice(0, 1).toUpperCase()}</span>
+                  <span className="flex-1 truncate text-left">{ws.name}</span>
+                  {ws.id === workspace.id && <Check size={11} className="shrink-0 text-[var(--foreground)]" />}
+                </button>
+              </form>
+            ))}
+            <Link href="/onboarding" onClick={closeAll} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"><Plus size={13} /><span>New workspace</span></Link>
+
+          </div>
+        )}
       </aside>
 
       {/* Mobile overlay */}
-      {mobileOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-label="Close sidebar overlay"
-        />
-      )}
+      {mobileOpen && (<button type="button" className="fixed inset-0 z-30 bg-black/60 md:hidden backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-label="Close sidebar overlay" />)}
 
       {/* Edit space modal */}
       {editingSpace && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-          role="presentation"
-          onClick={() => setEditingSpace(null)}
-        >
-          <form
-            action={updateSpace}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--foreground)]"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-space-title"
-          >
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="presentation" onClick={() => setEditingSpace(null)}>
+          <form action={updateSpace} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--foreground)]" role="dialog" aria-modal="true" aria-labelledby="edit-space-title">
             <div className="flex items-center justify-between">
               <h2 id="edit-space-title" className="text-lg font-semibold">Rename Space</h2>
-              <button
-                type="button"
-                onClick={() => setEditingSpace(null)}
-                className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-muted)]"
-                aria-label="Close rename space"
-              >
-                <X size={18} />
-              </button>
+              <button type="button" onClick={() => setEditingSpace(null)} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-muted)]" aria-label="Close rename space"><X size={18} /></button>
             </div>
             <input type="hidden" name="id" value={editingSpace.id} />
             <label className="mt-5 block text-sm font-medium">

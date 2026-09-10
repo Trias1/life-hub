@@ -8,7 +8,7 @@ import { ActionFeedback } from "@/components/action-feedback";
 import { Toaster } from "sonner";
 import { NotificationRealtime } from "@/components/notification-realtime";
 import { Sidebar } from "@/components/sidebar";
-import { TopNavbar } from "@/components/top-navbar";
+import { SearchProvider } from "@/components/search-provider";
 import {
   applyCustomizePreferences,
   readCustomizePreferences,
@@ -105,12 +105,8 @@ export function SidebarLayout({
         });
       }
       if ((event.ctrlKey || event.metaKey) && key === "k") {
-        event.preventDefault();
-        window.dispatchEvent(new Event("lifehub:open-global-search"));
       }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "t") {
-        event.preventDefault();
-        window.dispatchEvent(new Event("lifehub:toggle-theme"));
       }
       if (key === "g") {
         goChord = true;
@@ -172,15 +168,7 @@ export function SidebarLayout({
         signOut={signOut}
       />
       <main className="dashboard-content min-h-screen transition-[margin] duration-[250ms] md:ml-[var(--sidebar-width)]">
-        <TopNavbar
-          user={user}
-          workspace={workspace}
-          notifications={notifications}
-          signOut={signOut}
-          markAllRead={markAllRead}
-          onOpenMobile={() => setMobileOpen(true)}
-        />
-        <PageMotion>{children}</PageMotion>
+        <SearchProvider><PageMotion>{children}</PageMotion></SearchProvider>
         <Toaster position="bottom-right" closeButton richColors />
         <ActionFeedback />
         <NotificationRealtime userId={user.id} />
