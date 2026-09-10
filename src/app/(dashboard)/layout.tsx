@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace/server";
 import { redirect } from "next/navigation";
 import { SidebarLayout } from "@/components/sidebar-layout";
+import { createWorkspace } from "@/app/onboarding/actions";
 import { signOut } from "./_actions/auth";
 import {
   archiveSpace,
@@ -161,6 +162,7 @@ export default async function DashboardLayout({
       spaces={spaces ?? []}
       notifications={recentNotifications ?? []}
       createSpace={createSpace}
+      createWorkspace={createWorkspace}
       updateSpace={updateSpace}
       archiveSpace={archiveSpace}
       deleteSpace={deleteSpace}

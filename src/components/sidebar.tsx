@@ -27,6 +27,7 @@ import type { LucideIcon } from "lucide-react";
 
 type SignOutAction = () => Promise<void>;
 type CreateSpaceAction = (formData: FormData) => Promise<void>;
+type CreateWorkspaceAction = (formData: FormData) => Promise<void>;
 type SpaceAction = (formData: FormData) => Promise<void>;
 type SelectWorkspaceAction = (formData: FormData) => Promise<void>;
 type NavItem = {
@@ -57,6 +58,7 @@ type SidebarProps = {
   };
   spaces: Array<{ id: string; name: string; color: string }>;
   createSpace: CreateSpaceAction;
+  createWorkspace: CreateWorkspaceAction;
   updateSpace: SpaceAction;
   archiveSpace: SpaceAction;
   deleteSpace: SpaceAction;
@@ -101,6 +103,7 @@ export function Sidebar({
   counts,
   spaces,
   createSpace,
+  createWorkspace,
   updateSpace,
   archiveSpace,
   deleteSpace,
@@ -113,6 +116,7 @@ export function Sidebar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [spaceModal, setSpaceModal] = useState(false);
+  const [workspaceModal, setWorkspaceModal] = useState(false);
   const [spaceMenuId, setSpaceMenuId] = useState<string | null>(null);
   const [editingSpace, setEditingSpace] = useState<{
     id: string;
@@ -393,7 +397,7 @@ export function Sidebar({
                 </button>
               </form>
             ))}
-            <Link href="/onboarding" onClick={closeAll} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"><Plus size={13} /><span>New workspace</span></Link>
+            <button type="button" onClick={() => { closeAll(); setWorkspaceModal(true); }} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"><Plus size={13} /><span>New workspace</span></button>
 
           </div>
         )}
@@ -524,6 +528,46 @@ export function Sidebar({
           </form>
         </div>
       )}
+      {/* Create workspace modal */}
+      {workspaceModal && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+          role="presentation"
+          onClick={() => setWorkspaceModal(false)}
+        >
+          <form
+            action={createWorkspace}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 text-[var(--foreground)]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workspace-modal-title"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-widest text-[var(--muted)]">Step 1 of 1</p>
+                <h2 id="workspace-modal-title" className="mt-1 text-2xl font-bold">Create your workspace</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">Your workspace keeps data and collaboration together.</p>
+              </div>
+              <button type="button" onClick={() => setWorkspaceModal(false)} className="self-start rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-muted)]" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <label className="mt-6 block text-sm font-medium">
+              Workspace name
+              <input required name="name" defaultValue="My workspace" className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+            </label>
+            <label className="mt-4 block text-sm font-medium">
+              Workspace slug
+              <input required name="slug" defaultValue="my-workspace" className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+            </label>
+            <button type="submit" className="mt-6 w-full rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-[var(--on-accent)] hover:bg-[var(--accent-hover)]">
+              Create workspace
+            </button>
+          </form>
+        </div>
+      )}
+
     </>
   );
 }

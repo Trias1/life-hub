@@ -16,6 +16,7 @@ import {
 
 type SignOutAction = () => Promise<void>;
 type CreateSpaceAction = (formData: FormData) => Promise<void>;
+type CreateWorkspaceAction = (formData: FormData) => Promise<void>;
 type SpaceAction = (formData: FormData) => Promise<void>;
 type SelectWorkspaceAction = (formData: FormData) => Promise<void>;
 type MarkAllReadAction = () => Promise<void>;
@@ -46,6 +47,7 @@ type SidebarLayoutProps = {
   spaces: Array<{ id: string; name: string; color: string }>;
   notifications: NotificationItem[];
   createSpace: CreateSpaceAction;
+  createWorkspace: CreateWorkspaceAction;
   updateSpace: SpaceAction;
   archiveSpace: SpaceAction;
   deleteSpace: SpaceAction;
@@ -63,6 +65,7 @@ export function SidebarLayout({
   spaces,
   notifications,
   createSpace,
+  createWorkspace,
   updateSpace,
   archiveSpace,
   deleteSpace,
@@ -161,6 +164,7 @@ export function SidebarLayout({
         counts={counts}
         spaces={spaces}
         createSpace={createSpace}
+        createWorkspace={createWorkspace}
         updateSpace={updateSpace}
         archiveSpace={archiveSpace}
         deleteSpace={deleteSpace}
