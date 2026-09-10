@@ -19,9 +19,10 @@ export function useImageUpload() {
     }
   }
   async function processImages(htmlContent: string, workspaceId: string) {
+    const normalizedContent = htmlContent.replace(/!\[([^\]]*)\]\((data:image\/[^)]+)\)/g, '<img alt="$1" src="$2">')
     const imagePattern = /<img\b([^>]*?)src=["\'](data:image\/[^"\']+)["\']([^>]*)>/gi
-    const matches = Array.from(htmlContent.matchAll(imagePattern))
-    let cleaned = htmlContent
+    const matches = Array.from(normalizedContent.matchAll(imagePattern))
+    let cleaned = normalizedContent
     for (const match of matches) {
       const dataUrl = match[2]
       const response = await fetch(dataUrl)

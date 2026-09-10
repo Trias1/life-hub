@@ -19,7 +19,7 @@ export async function createWorkspace(formData: FormData): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) fail("You must sign in first.")
 
-  const { error } = await supabase.rpc("create_workspace", { workspace_name: input.data.name, workspace_slug: input.data.slug })
-  if (error) fail(error.code === "23505" ? "That workspace slug is already taken." : `Workspace could not be created (${error.code ?? "unknown"}).`)
-  redirect("/dashboard")
+  const { data: workspaceId, error } = await supabase.rpc("create_workspace", { workspace_name: input.data.name, workspace_slug: input.data.slug })
+  if (error || typeof workspaceId !== "string") fail(error?.code === "23505" ? "That workspace slug is already taken." : `Workspace could not be created (${error?.code ?? "unknown"}).`)
+  redirect("/dashboard?workspace=" + encodeURIComponent(workspaceId))
 }

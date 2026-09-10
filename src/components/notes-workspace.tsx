@@ -69,8 +69,8 @@ export function NotesWorkspace({ workspaceId, notes, versions, selectedNoteId, v
           setDraft(nextDraft)
           setSavedDraft(nextDraft)
           setStatus("Saved")
-        } catch {
-          setStatus("Images could not be uploaded. Note was not saved.")
+        } catch (error) {
+          setStatus("Image upload failed: " + (error instanceof Error ? error.message : "Unknown error"))
         }
       })()
     }, 800)

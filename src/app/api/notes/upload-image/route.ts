@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const parentId = await storage.ensureFolder(["workspaces", context.workspaceId, "images"])
     const uploaded = await storage.upload({ name: file.name.replace(/[^a-zA-Z0-9._-]/g, "-"), mimeType: file.type, body: Buffer.from(await file.arrayBuffer()), sizeBytes: file.size, parentId })
     await storage.makePublic(uploaded.id)
-    return NextResponse.json({ url: "https://drive.google.com/uc?export=view&id=" + encodeURIComponent(uploaded.id) })
+    return NextResponse.json({ url: "/api/images/" + encodeURIComponent(uploaded.id) })
   } catch {
     return NextResponse.json({ error: "Could not upload image" }, { status: 500 })
   }

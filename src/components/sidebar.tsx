@@ -3,12 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   Bookmark,
   CalendarDays,
   Check,
+  ChevronsUpDown,
   ClipboardList,
   Folder,
   LayoutDashboard,
@@ -117,12 +118,24 @@ export function Sidebar({
   const [query, setQuery] = useState("");
   const [spaceModal, setSpaceModal] = useState(false);
   const [workspaceModal, setWorkspaceModal] = useState(false);
+  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const workspaceSwitcherRef = useRef<HTMLDivElement>(null);
   const [spaceMenuId, setSpaceMenuId] = useState<string | null>(null);
   const [editingSpace, setEditingSpace] = useState<{
     id: string;
     name: string;
     color: string;
   } | null>(null);
+
+
+  useEffect(() => {
+    if (!workspaceSwitcherOpen) return
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!workspaceSwitcherRef.current?.contains(event.target as Node)) setWorkspaceSwitcherOpen(false)
+    }
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => document.removeEventListener("mousedown", handleOutsideClick)
+  }, [workspaceSwitcherOpen])
 
   const closeAll = () => {
     setProfileOpen(false);
@@ -193,31 +206,41 @@ export function Sidebar({
         aria-label="Sanctum Cove sidebar"
       >
         {/* Header */}
-        <div className="flex h-[72px] items-center justify-between border-b border-[var(--line)] px-4">
-          <Link
-            href="/dashboard"
-            onClick={(e) => {
-              e.preventDefault();
-              toggleCollapsed();
-            }}
-            className="flex min-w-0 items-center gap-3"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <span className="brand-mark shrink-0">SC</span>
-            {!collapsed && (
-              <span className="truncate text-[18px] font-semibold tracking-tight text-[var(--foreground)]">
-                Sanctum Cove
-              </span>
-            )}
-          </Link>
-          <button
-            type="button"
-            onClick={() => setMobileOpen(false)}
-            className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] md:hidden"
-            aria-label="Close sidebar"
-          >
-            <X size={18} />
-          </button>
+        <div className="border-b border-[var(--line)]">
+          <div className="flex h-[72px] items-center justify-between px-4">
+            <Link href="/dashboard" onClick={(e) => { e.preventDefault(); toggleCollapsed(); }} className="flex min-w-0 items-center gap-3" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+              <span className="brand-mark shrink-0">SC</span>
+              {!collapsed && <span className="truncate text-[18px] font-semibold tracking-tight text-[var(--foreground)]">Sanctum Cove</span>}
+            </Link>
+            <button type="button" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] md:hidden" aria-label="Close sidebar"><X size={18} /></button>
+          </div>
+          {!collapsed && (
+            <div ref={workspaceSwitcherRef} className="relative px-3 pb-3">
+              <button type="button" onClick={() => setWorkspaceSwitcherOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-[var(--surface-muted)]">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded bg-[var(--accent)] text-[10px] font-bold text-[var(--on-accent)]">{workspace.name.slice(0, 1).toUpperCase()}</span>
+                <span className="flex-1 truncate text-sm font-semibold text-[var(--foreground)]">{workspace.name}</span>
+                <ChevronsUpDown size={14} className="shrink-0 text-[var(--muted)]" />
+              </button>
+              {workspaceSwitcherOpen && (
+                <div className="absolute left-3 right-3 top-full z-50 mt-1 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2 shadow-xl">
+                  <p className="truncate px-2 py-1 text-[11px] text-[var(--muted)]">{user.email}</p>
+                  <div className="my-1 border-t border-[var(--line)]" />
+                  {workspaces.map((ws) => (
+                    <form key={ws.id} action={selectWorkspace}>
+                      <input type="hidden" name="workspaceId" value={ws.id} />
+                      <button className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (ws.id === workspace.id ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]")}>
+                        <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{ws.name.slice(0, 1).toUpperCase()}</span>
+                        <span className="flex-1 truncate text-left">{ws.name}</span>
+                        {ws.id === workspace.id && <Check size={11} className="shrink-0" />}
+                      </button>
+                    </form>
+                  ))}
+                  <div className="my-1 border-t border-[var(--line)]" />
+                  <button type="button" onClick={() => { setWorkspaceSwitcherOpen(false); setWorkspaceModal(true); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"><Plus size={13} /><span>New workspace</span></button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {!collapsed && (
@@ -383,24 +406,6 @@ export function Sidebar({
           )}
         </div>
 
-        {/* Account & workspace panel */}
-        {!collapsed && (
-          <div className="space-y-0.5 border-t border-[var(--line)] px-3 py-2">
-            <p className="truncate px-2 py-1 text-[11px] text-[var(--muted)]">{user.email}</p>
-            {workspaces.map((ws) => (
-              <form key={ws.id} action={selectWorkspace}>
-                <input type="hidden" name="workspaceId" value={ws.id} />
-                <button className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (ws.id === workspace.id ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]")}>
-                  <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{ws.name.slice(0, 1).toUpperCase()}</span>
-                  <span className="flex-1 truncate text-left">{ws.name}</span>
-                  {ws.id === workspace.id && <Check size={11} className="shrink-0 text-[var(--foreground)]" />}
-                </button>
-              </form>
-            ))}
-            <button type="button" onClick={() => { closeAll(); setWorkspaceModal(true); }} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"><Plus size={13} /><span>New workspace</span></button>
-
-          </div>
-        )}
       </aside>
 
       {/* Mobile overlay */}

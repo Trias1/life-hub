@@ -20,6 +20,7 @@ function markdownToHtml(value: string) {
     if (line.startsWith("# ")) return "<h1>" + line.slice(2) + "</h1>"
     if (line.startsWith("- ")) return "<ul><li>" + line.slice(2) + "</li></ul>"
     if (line.startsWith("> ")) return "<blockquote><p>" + line.slice(2) + "</p></blockquote>"
+    if (/^!\[/.test(line)) return line.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
     return line ? "<p>" + line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>") + "</p>" : "<p></p>"
   }).join("")
 }
