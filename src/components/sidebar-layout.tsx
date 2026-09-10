@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { InactivityGuard } from "@/components/inactivity-guard";
 import { PageMotion } from "@/components/page-motion";
@@ -153,6 +154,20 @@ export function SidebarLayout({
       }
       className="min-h-screen bg-[var(--background)]"
     >
+      {/* Mobile top bar */}
+      <header className="top-navbar fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-muted)]"
+          aria-label="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+        <span className="text-sm font-semibold text-[var(--foreground)]">Sanctum Cove</span>
+        <div className="w-9" />
+      </header>
+
       <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -171,7 +186,7 @@ export function SidebarLayout({
         selectWorkspace={selectWorkspace}
         signOut={signOut}
       />
-      <main className="dashboard-content min-h-screen transition-[margin] duration-[250ms] md:ml-[var(--sidebar-width)]">
+      <main className="dashboard-content min-h-screen pt-14 transition-[margin] duration-[250ms] md:ml-[var(--sidebar-width)] md:pt-0">
         <SearchProvider><PageMotion>{children}</PageMotion></SearchProvider>
         <Toaster position="bottom-right" closeButton richColors />
         <ActionFeedback />
