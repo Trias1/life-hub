@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Select } from "@/components/ui/select";
 import { BookmarkComposer } from "@/components/bookmark-composer";
+import { Pagination } from "@/components/ui/pagination";
 import { getWorkspaceContext } from "@/lib/workspace/server";
 import {
   archiveBookmark,
@@ -42,6 +43,7 @@ export default async function BookmarksPage({
     favorite?: string;
     tag?: string;
     view?: string;
+    page?: string;
   }>;
 }) {
   const {
@@ -53,6 +55,7 @@ export default async function BookmarksPage({
     favorite = "false",
     tag = "",
     view = "grid",
+    page: pageParam,
   } = await searchParams;
   const query = q.trim().slice(0, 80).toLowerCase();
   const selectedTag = tag.trim().slice(0, 50).toLowerCase();
@@ -81,6 +84,12 @@ export default async function BookmarksPage({
         bookmark.url.toLowerCase().includes(query) ||
         bookmark.collection.toLowerCase().includes(query)),
   );
+  const perPage = 5;
+  const currentPage = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const totalPages = Math.max(1, Math.ceil(bookmarks.length / perPage));
+  const page = Math.min(currentPage, totalPages);
+  const pagedBookmarks = bookmarks.slice((page - 1) * perPage, page * perPage);
+
   const collections = Array.from(
     new Set(source.map((bookmark) => bookmark.collection)),
   ).sort();
@@ -215,9 +224,9 @@ export default async function BookmarksPage({
         </Link>
       </form>
       <section className="mt-8">
-        {bookmarks.length ? (
+        {pagedBookmarks.length ? (
           <div className={currentView === "grid" ? "card-grid" : "space-y-3"}>
-            {bookmarks.map((bookmark) => {
+            {pagedBookmarks.map((bookmark) => {
               const host = bookmarkHost(bookmark.url);
               const favicon = bookmarkFavicon(bookmark.url);
               return (
@@ -364,6 +373,14 @@ export default async function BookmarksPage({
           </div>
         )}
       </section>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        buildHref={(nextPage) =>
+          "/bookmarks?" +
+          new URLSearchParams({ q, collection, archived, favorite, tag, view, page: String(nextPage) }).toString()
+        }
+      />
     </div>
   );
 }

@@ -80,6 +80,7 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [taskStatuses, setTaskStatuses] = useState<Record<string, TaskStatus>>(() => Object.fromEntries(tasks.map((task) => [task.id, task.status])))
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null)
+  const [listPage, setListPage] = useState(1)
   const today = dateKey(new Date())
   const assignees = useMemo(() => [...new Set(tasks.map((task) => task.assignee_id).filter((id): id is string => Boolean(id)))], [tasks])
   const filteredTasks = useMemo(() => {
@@ -155,9 +156,14 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
         </div>
       </div>
 
-      {view === "list" ? (
+      {view === "list" ? (() => {
+        const tasksPerPage = 5
+        const totalPages = Math.max(1, Math.ceil(filteredTasks.length / tasksPerPage))
+        const page = Math.min(listPage, totalPages)
+        const pagedTasks = filteredTasks.slice((page - 1) * tasksPerPage, page * tasksPerPage)
+        return (
         <div className="task-board-column-tasks mt-4 space-y-3">
-          {filteredTasks.length ? filteredTasks.map((task) => (
+          {pagedTasks.length ? pagedTasks.map((task) => (
             <article id={`task-${task.id}`} key={task.id} className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="font-medium">{task.title}</p>
@@ -168,8 +174,10 @@ export function TaskBoard({ tasks, action, advanced }: { tasks: Task[]; action: 
               <TaskDetails taskId={task.id} title={task.title} description={task.description} priority={task.priority} dueDate={task.due_date} assigneeId={task.assignee_id} advanced={advanced} />
             </article>
           )) : <div className="empty-state surface"><h2 className="font-semibold">No matching tasks</h2><p>Try a different search or filter.</p></div>}
+          {filteredTasks.length > tasksPerPage && <div className="flex items-center justify-between px-1 text-xs text-zinc-500"><button type="button" onClick={() => setListPage((value) => Math.max(1, value - 1))} disabled={page <= 1} className="button-quiet min-h-0 px-2 py-1 text-xs disabled:opacity-40">Prev</button><span>Page {page} of {totalPages}</span><button type="button" onClick={() => setListPage((value) => Math.min(totalPages, value + 1))} disabled={page >= totalPages} className="button-quiet min-h-0 px-2 py-1 text-xs disabled:opacity-40">Next</button></div>}
         </div>
-      ) : (
+        )
+      })() : (
         <div className="task-board-kanban mt-4">
           {columns.map(([columnStatus, label]) => {
             const columnTasks = filteredTasks.filter((task) => task.status === columnStatus)
