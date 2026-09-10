@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   Archive,
   Bookmark,
@@ -73,6 +74,23 @@ function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024 * 1024)
     return (bytes / 1024 / 1024).toFixed(1) + " MB";
   return (bytes / 1024 / 1024 / 1024).toFixed(1) + " GB";
+}
+
+function WorkspaceOptionButton({
+  name,
+  active,
+}: { name: string; active: boolean }) {
+  const { pending } = useFormStatus()
+  return (
+    <button
+      disabled={pending}
+      className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (active ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]") + (pending ? " cursor-wait opacity-60" : "")}
+    >
+      <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{name.slice(0, 1).toUpperCase()}</span>
+      <span className="flex-1 truncate text-left">{pending ? "Switching�" : name}</span>
+      {active && !pending && <Check size={11} className="shrink-0" />}
+    </button>
+  )
 }
 
 function Badge({ value }: { value?: number }) {
@@ -228,11 +246,7 @@ export function Sidebar({
                   {workspaces.map((ws) => (
                     <form key={ws.id} action={selectWorkspace} onSubmit={() => { window.setTimeout(() => window.location.reload(), 1500) }}>
                       <input type="hidden" name="workspaceId" value={ws.id} />
-                      <button className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (ws.id === workspace.id ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]")}>
-                        <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{ws.name.slice(0, 1).toUpperCase()}</span>
-                        <span className="flex-1 truncate text-left">{ws.name}</span>
-                        {ws.id === workspace.id && <Check size={11} className="shrink-0" />}
-                      </button>
+                      <WorkspaceOptionButton name={ws.name} active={ws.id === workspace.id} />
                     </form>
                   ))}
                   <div className="my-1 border-t border-[var(--line)]" />
