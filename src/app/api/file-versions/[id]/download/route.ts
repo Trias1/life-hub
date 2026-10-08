@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const download = await getStorageForWorkspace(context.workspaceId).download(fileId)
     return new NextResponse(Readable.toWeb(download.body) as ReadableStream, { headers: storageResponseHeaders(download, new URL(request.url).searchParams.get("inline") === "1") })
-  } catch (downloadError) {
+  } catch {
     console.error("download file version")
     return NextResponse.json({ error: "Could not download file version" }, { status: 502 })
   }

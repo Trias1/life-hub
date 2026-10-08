@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
-  Archive,
   Bookmark,
   CalendarDays,
   Check,
@@ -14,13 +13,10 @@ import {
   ClipboardList,
   Folder,
   LayoutDashboard,
-  MoreHorizontal,
   Notebook,
-  Pencil,
   Plus,
   Search,
   Settings,
-  Trash2,
   Upload,
   Users,
   X,
@@ -104,15 +100,6 @@ function Badge({ value }: { value?: number }) {
   ) : null;
 }
 
-function dotColor(color: string) {
-  return color === "blue"
-    ? "bg-blue-400"
-    : color === "emerald"
-      ? "bg-emerald-400"
-      : color === "rose"
-        ? "bg-rose-400"
-        : "bg-[var(--accent)]";
-}
 
 export function Sidebar({
   collapsed,
@@ -123,12 +110,9 @@ export function Sidebar({
   workspace,
   workspaces,
   counts,
-  spaces,
   createSpace,
   createWorkspace,
   updateSpace,
-  archiveSpace,
-  deleteSpace,
   selectWorkspace,
   signOut,
 }: SidebarProps) {
@@ -136,13 +120,11 @@ export function Sidebar({
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [spaceModal, setSpaceModal] = useState(false);
   const [workspaceModal, setWorkspaceModal] = useState(false);
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const workspaceSwitcherRef = useRef<HTMLDivElement>(null);
-  const [spaceMenuId, setSpaceMenuId] = useState<string | null>(null);
   const [editingSpace, setEditingSpace] = useState<{
     id: string;
     name: string;
@@ -162,7 +144,6 @@ export function Sidebar({
   const closeAll = () => {
     setProfileOpen(false);
     setMobileOpen(false);
-    setSpaceMenuId(null);
   };
 
   const toggleCollapsed = () =>
@@ -195,15 +176,9 @@ export function Sidebar({
     item.label.toLowerCase().includes(query.toLowerCase()),
   );
 
-  const navigate = (href: string) => {
-    setMobileOpen(false);
-    router.push(href);
-  };
-
   useEffect(() => {
     const openSearch = () => {
       setCollapsed(false);
-      setSearchOpen(true);
       setQuery("");
     };
     const go = (event: Event) => {

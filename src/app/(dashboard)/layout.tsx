@@ -133,7 +133,7 @@ export default async function DashboardLayout({
       driveConnected = false;
       try {
         await clearWorkspaceDriveConnection(context.workspaceId)
-      } catch (clearError) {
+      } catch {
         console.error("Could not clear invalid Google Drive connection")
       }
     } else {

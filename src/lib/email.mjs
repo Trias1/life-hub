@@ -26,7 +26,7 @@ function gmailTransporter() {
 async function sendWithGmail({ email, role, link }) {
   const transporter = gmailTransporter()
   if (!transporter) return "not_configured"
-  const result = await transporter.sendMail({
+  await transporter.sendMail({
     from: `LifeHub <${process.env.GMAIL_USER}>`,
     to: email,
     subject: "You are invited to join LifeHub",
@@ -51,7 +51,6 @@ export async function sendWorkspaceInvitation({ email, token, role }) {
       }),
     })
     if (response.ok) return "sent"
-    const details = await response.text()
     console.error("[resend] invitation rejected", { status: response.status })
   }
   return sendWithGmail({ email, role, link })

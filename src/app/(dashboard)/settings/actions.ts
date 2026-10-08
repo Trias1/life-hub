@@ -70,7 +70,7 @@ export async function uploadProfileAvatar(formData: FormData): Promise<void> {
   if (error) {
     try {
       await storage.delete(uploaded.id)
-    } catch (rollbackError) {
+    } catch {
       console.error("Could not remove orphaned Google Drive avatar")
     }
     actionFailure(returnPath, "save profile photo", error)

@@ -65,7 +65,6 @@ export function SidebarLayout({
   workspaces,
   counts,
   spaces,
-  notifications,
   createSpace,
   createWorkspace,
   updateSpace,
@@ -73,7 +72,6 @@ export function SidebarLayout({
   deleteSpace,
   selectWorkspace,
   signOut,
-  markAllRead,
 }: SidebarLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);

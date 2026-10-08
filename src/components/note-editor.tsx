@@ -25,7 +25,7 @@ function markdownToHtml(value: string) {
   }).join("")
 }
 
-export function NoteEditor({ value, onChange, workspaceId, placeholder = "Start writing…", height = 240 }: Props) {
+export function NoteEditor({ value, onChange, placeholder = "Start writing…", height = 240 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [slashOpen, setSlashOpen] = useState(false)
   const [toolbarOpen, setToolbarOpen] = useState(false)
@@ -79,6 +79,8 @@ export function NoteEditor({ value, onChange, workspaceId, placeholder = "Start 
       if (node.type.name === "heading") items.push({ id: "heading-" + position, text: node.textContent || "Untitled", level: Number(node.attrs.level) })
     })
     return items
+    // `value` is a deliberate trigger: the editor mutates in place, so headings are re-read when the content changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, value])
 
   function command(action: () => void) {

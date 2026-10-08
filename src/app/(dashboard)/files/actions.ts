@@ -37,7 +37,7 @@ export async function uploadFile(formData: FormData): Promise<void> {
   if (error) {
     try {
       await storage.delete(uploaded.id)
-    } catch (rollbackError) {
+    } catch {
       console.error("Could not remove orphaned Google Drive upload")
     }
     actionFailure("/files/upload", "save file metadata", error)
@@ -142,7 +142,7 @@ export async function uploadFileVersion(formData: FormData): Promise<void> {
   if (error) {
     try {
       await storage.delete(uploaded.id)
-    } catch (rollbackError) {
+    } catch {
       console.error("Could not remove orphaned Google Drive file version")
     }
     actionFailure(back, "save file version metadata", error)

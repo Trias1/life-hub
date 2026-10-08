@@ -31,7 +31,6 @@ const avatarMigration = readFileSync(new URL("../supabase/migrations/0017_profil
 const dashboardPage = readFileSync(new URL("../src/app/(dashboard)/dashboard/page.tsx", import.meta.url), "utf8")
 const dashboardLayout = readFileSync(new URL("../src/app/(dashboard)/layout.tsx", import.meta.url), "utf8")
 const sidebar = readFileSync(new URL("../src/components/sidebar.tsx", import.meta.url), "utf8")
-const sidebarLayout = readFileSync(new URL("../src/components/sidebar-layout.tsx", import.meta.url), "utf8")
 const notesWorkspace = readFileSync(new URL("../src/components/notes-workspace.tsx", import.meta.url), "utf8")
 const storageInterface = readFileSync(new URL("../src/lib/storage/storage.ts", import.meta.url), "utf8")
 const filesActions = readFileSync(new URL("../src/app/(dashboard)/files/actions.ts", import.meta.url), "utf8")

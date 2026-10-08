@@ -11,6 +11,7 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState("")
   const [saving, setSaving] = useState(false)
   const [ready, setReady] = useState(false)
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -27,6 +28,7 @@ export default function ResetPasswordPage() {
       if (session) {
         setReady(true)
       }
+      setChecked(true)
     })
 
     return () => {
@@ -79,9 +81,14 @@ export default function ResetPasswordPage() {
               placeholder="••••"
             />
           </label>
-          <button disabled={saving} className="button-primary w-full">
-            {saving ? "Saving..." : "Update password"}
+          <button disabled={saving || !ready} className="button-primary w-full">
+            {saving ? "Saving..." : ready ? "Update password" : "Verifying link..."}
           </button>
+          {checked && !ready && (
+            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              This reset link is invalid or has expired. <Link href="/forgot-password" className="underline underline-offset-4">Request a new one</Link>.
+            </p>
+          )}
           {message && (
             <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {message}

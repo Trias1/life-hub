@@ -37,7 +37,7 @@ export function TaskBoard({ tasks, action }: { tasks: BoardTask[]; action: TaskA
     formData.set("status", status)
     formData.set("from", "board")
     startTransition(async () => {
-      try { await action(formData) } finally { setPending(({ [taskId]: _done, ...rest }) => rest) }
+      try { await action(formData) } finally { setPending((current) => { const next = { ...current }; delete next[taskId]; return next }) }
     })
   }
 

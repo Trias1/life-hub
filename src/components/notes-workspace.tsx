@@ -2,14 +2,11 @@
 
 import { formatDate, formatDateTime } from "@/lib/format-date"
 
-import dynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
 import { NoteEditor } from "@/components/note-editor"
 import { Star } from "lucide-react"
 import { useImageUpload } from "@/hooks/use-image-upload"
 import "@uiw/react-md-editor/markdown-editor.css"
-
-const MarkdownEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false })
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
@@ -81,6 +78,8 @@ export function NotesWorkspace({ workspaceId, notes, versions, selectedNoteId, v
       })()
     }, 800)
     return () => window.clearTimeout(timeout)
+    // processImages is recreated every render; listing it would restart the autosave timer on each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, savedDraft, selected, updateNote])
 
   async function copyLink() {
