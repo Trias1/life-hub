@@ -74,3 +74,7 @@ vercel --prod
 ```
 
 Terakhir diverifikasi pada 9 September 2026.
+
+## License
+
+Released under the [MIT License](LICENSE).
