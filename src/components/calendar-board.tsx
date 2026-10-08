@@ -1,231 +1,183 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
-import { DateTimePicker } from "@/components/date-time-picker"
-import { Select } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Plus, Repeat } from "lucide-react"
+import { addDaysToKey, addMonthsToKey, colorLabel, colorTone, dayKey, daysInMonthOfKey, formatKeyLong, formatKeyMonth, formatKeyShort, formatTime, repeatLabel, weekdayOfKey } from "@/components/calendar/calendar-format"
 
-type CalendarEvent = { id: string; source_id: string; occurrence_index: number; title: string; description: string; starts_at: string; ends_at: string; recurrence_rule: string | null; color: string; reminder_minutes: number | null; creator_id?: string }
-type CalendarAttendee = { id: string; event_id: string; user_id: string | null; email: string | null; response: string }
-type CalendarView = "agenda" | "month" | "week" | "day"
-type FormAction = (formData: FormData) => Promise<void>
-type Props = { events: CalendarEvent[]; attendees: CalendarAttendee[]; members: Array<{ user_id: string; role: string }>; currentUserId: string; currentUserEmail: string; updateEvent: FormAction; deleteEvent: FormAction; addEventAttendee: FormAction; removeEventAttendee: FormAction; respondEventAttendee: FormAction }
+export type CalendarView = "agenda" | "month" | "week" | "day"
+export type BoardEvent = { id: string; sourceId: string; title: string; startsAt: string; endsAt: string; color: string; recurrence: string | null }
+export type BoardGoogleEvent = { id: string; title: string; startsAt: string; endsAt: string; htmlLink: string | null }
+type Props = { events: BoardEvent[]; googleEvents: BoardGoogleEvent[]; todayKey: string; initialView: CalendarView }
+type Item = { key: string; title: string; startsAt: string; endsAt: string; day: string; href: string; google: boolean; color: string; recurrence: string | null }
 
-function localDateTime(value: string) {
-  const date = new Date(value)
-  const pad = (part: number) => String(part).padStart(2, "0")
-  return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes())
+const views: Array<[CalendarView, string]> = [["agenda", "Agenda"], ["month", "Month"], ["week", "Week"], ["day", "Day"]]
+const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+function groupByDay(items: Item[]) {
+  const groups = new Map<string, Item[]>()
+  for (const item of items) groups.set(item.day, [...(groups.get(item.day) ?? []), item])
+  return Array.from(groups.entries())
 }
 
-function attendeeLabel(attendee: CalendarAttendee) {
-  return attendee.email ?? (attendee.user_id ? "Member " + attendee.user_id.slice(0, 8) : "Workspace attendee")
+function EventTitle({ item, className }: { item: Item; className: string }) {
+  return item.google
+    ? <a href={item.href} target="_blank" rel="noopener noreferrer" className={className}>{item.title}</a>
+    : <Link href={item.href} className={className}>{item.title}</Link>
 }
 
-export function CalendarBoard({ events, attendees, members, currentUserId, currentUserEmail, updateEvent, deleteEvent, addEventAttendee, removeEventAttendee, respondEventAttendee }: Props) {
-  const [view, setView] = useState<CalendarView>("agenda")
-  const [displayDate, setDisplayDate] = useState(() => new Date())
-  const prevMonth = () => setDisplayDate((previous) => new Date(previous.getFullYear(), previous.getMonth() - 1, 1))
-  const nextMonth = () => setDisplayDate((previous) => new Date(previous.getFullYear(), previous.getMonth() + 1, 1))
-  const goToToday = () => setDisplayDate(new Date())
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const today = useMemo(() => new Date(), [])
-  const selected = events.find((event) => event.id === selectedId)
-  const selectedSourceId = selected?.source_id ?? selected?.id
-  const selectedAttendees = attendees.filter((attendee) => attendee.event_id === selectedSourceId)
-  const canManageAttendees = selected?.creator_id === currentUserId
-  const monthDays = useMemo(() => {
-    const start = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
-    const end = new Date(displayDate.getFullYear(), displayDate.getMonth() + 1, 0)
-    const days = []
-    for (let index = 1; index <= end.getDate(); index += 1)
-      days.push(new Date(displayDate.getFullYear(), displayDate.getMonth(), index))
-    return { start, days }
-  }, [displayDate])
-  const eventsForDay = (date: Date) => events.filter((event) => new Date(event.starts_at).toDateString() === date.toDateString())
-  const eventCard = (event: CalendarEvent) => (
-    <button
-      key={event.id}
-      type="button"
-      onClick={() => setSelectedId(event.id)}
-      className="surface flex w-full flex-col gap-2 p-5 text-left transition hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <span>
-        <span className="block font-semibold">{event.title}</span>
-        <span className="mt-1 block text-sm text-[var(--muted)]">
-          {new Date(event.starts_at).toLocaleString()} Â· {new Date(event.ends_at).toLocaleString()}
-        </span>
-      </span>
-      <span className="w-fit rounded-full bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-semibold text-[var(--foreground)]">
-        {event.recurrence_rule ? "Recurring" : "Scheduled"}
-      </span>
-    </button>
+// Month cell chip: .tag-chip is unlayered CSS, so its display wins over Tailwind utilities.
+function MonthChip({ item }: { item: Item }) {
+  const props = { className: "tag-chip w-full truncate", "data-tone": item.google ? "teal" : colorTone(item.color), style: { display: "block" }, title: formatTime(item.startsAt) + " " + item.title }
+  return item.google
+    ? <a href={item.href} target="_blank" rel="noopener noreferrer" {...props}>{item.title}</a>
+    : <Link href={item.href} {...props}>{item.title}</Link>
+}
+
+function EventRow({ item }: { item: Item }) {
+  const Icon = item.google ? ExternalLink : item.recurrence ? Repeat : CalendarDays
+  return (
+    <li className="issue-row">
+      <Icon size={16} className="issue-row-icon" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <EventTitle item={item} className="issue-row-title" />
+        <p className="issue-row-meta">
+          {formatTime(item.startsAt)}–{formatTime(item.endsAt)}
+          {item.google ? " · Google Calendar · read-only" : item.recurrence ? " · " + repeatLabel(item.recurrence) : ""}
+        </p>
+      </div>
+      <div className="issue-row-side">
+        {item.google ? <span className="tag-chip" data-tone="teal">Google</span> : <span className="tag-chip" data-tone={colorTone(item.color)}>{colorLabel(item.color)}</span>}
+      </div>
+    </li>
   )
+}
+
+function DayGroups({ groups, todayKey, emptyText }: { groups: Array<[string, Item[]]>; todayKey: string; emptyText?: string }) {
+  if (!groups.length) return <div className="issue-empty"><h2>Nothing scheduled</h2><p>{emptyText ?? "No events in this range."}</p></div>
+  return (
+    <div>
+      {groups.map(([day, items]) => (
+        <section key={day} className="mt-5 first:mt-4" aria-label={formatKeyLong(day)}>
+          <h3 className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span>{formatKeyLong(day)}{day === todayKey ? " · Today" : ""}</span>
+            <Link href={"/calendar/new?date=" + day} className="button-quiet min-h-0 px-2 py-1 normal-case tracking-normal" aria-label={"New event on " + formatKeyLong(day)}><Plus size={13} /></Link>
+          </h3>
+          {items.length ? <ul className="issue-list mt-2">{items.map((item) => <EventRow key={item.key} item={item} />)}</ul> : <p className="mt-2 border-t border-[var(--line)] py-3 text-sm text-[var(--muted)]">No events.</p>}
+        </section>
+      ))}
+    </div>
+  )
+}
+
+export function CalendarBoard({ events, googleEvents, todayKey, initialView }: Props) {
+  const [view, setViewState] = useState<CalendarView>(initialView)
+  const [cursor, setCursor] = useState(todayKey)
+  const [showPast, setShowPast] = useState(false)
+
+  const items = useMemo<Item[]>(() => [
+    ...events.map((event) => ({ key: event.id, title: event.title, startsAt: event.startsAt, endsAt: event.endsAt, day: dayKey(event.startsAt), href: "/calendar/" + event.sourceId, google: false, color: event.color, recurrence: event.recurrence })),
+    ...googleEvents.map((event) => ({ key: "google:" + event.id, title: event.title, startsAt: event.startsAt, endsAt: event.endsAt, day: dayKey(event.startsAt), href: event.htmlLink ?? "https://calendar.google.com", google: true, color: "", recurrence: null })),
+  ].sort((a, b) => a.startsAt.localeCompare(b.startsAt)), [events, googleEvents])
+  const byDay = useMemo(() => new Map(groupByDay(items)), [items])
+
+  function setView(next: CalendarView) {
+    setViewState(next)
+    const url = new URL(window.location.href)
+    if (next === "agenda") url.searchParams.delete("view")
+    else url.searchParams.set("view", next)
+    url.searchParams.delete("success")
+    url.searchParams.delete("error")
+    window.history.replaceState(null, "", url.pathname + url.search)
+  }
+  function openDay(day: string) {
+    setCursor(day)
+    setView("day")
+  }
+  function step(direction: 1 | -1) {
+    setCursor((current) => view === "month" ? addMonthsToKey(current, direction) : addDaysToKey(current, view === "week" ? 7 * direction : direction))
+  }
+
+  const upcomingItems = items.filter((item) => item.day >= todayKey)
+  const pastItems = items.filter((item) => item.day < todayKey)
+  const monthStart = cursor.slice(0, 8) + "01"
+  const weekStart = addDaysToKey(cursor, -weekdayOfKey(cursor))
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDaysToKey(weekStart, index))
+  const rangeLabel = view === "month" ? formatKeyMonth(cursor) : view === "week" ? formatKeyShort(weekDays[0]) + " – " + formatKeyShort(weekDays[6]) : formatKeyLong(cursor)
 
   return (
-    <section className="mt-8">
-      {/* Toolbar */}
-      <div className="toolbar mb-4">
-        <div>
-          <p className="eyebrow">{displayDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</p>
-          <h2 className="mt-1 text-lg font-semibold">Your schedule</h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--surface-muted)] p-1">
-          {(["agenda", "month", "week", "day"] as CalendarView[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setView(item)}
-              className={view === item ? "button-secondary min-h-0 px-3 py-1.5 text-xs capitalize" : "button-quiet min-h-0 px-3 py-1.5 text-xs capitalize"}
-            >
-              {item}
+    <section aria-label="Calendar">
+      <div className="issue-list-head">
+        <nav aria-label="Calendar views" className="issue-tabs">
+          {views.map(([key, text]) => (
+            <button key={key} type="button" onClick={() => setView(key)} aria-current={view === key ? "page" : undefined} className={"issue-tab" + (view === key ? " is-active" : "")}>
+              {text}{key === "agenda" && <span className="issue-tab-count">{upcomingItems.length}</span>}
             </button>
           ))}
+        </nav>
+        {view !== "agenda" && (
+          <div className="flex min-w-0 items-center gap-1 pb-2">
+            <button type="button" onClick={() => step(-1)} className="button-secondary min-h-0 p-1.5" aria-label={"Previous " + view}><ChevronLeft size={16} /></button>
+            <button type="button" onClick={() => setCursor(todayKey)} className="button-secondary min-h-0 px-3 py-1.5 text-xs">Today</button>
+            <button type="button" onClick={() => step(1)} className="button-secondary min-h-0 p-1.5" aria-label={"Next " + view}><ChevronRight size={16} /></button>
+            <span className="ml-2 truncate text-sm font-semibold">{rangeLabel}</span>
           </div>
-          {view === "month" && (
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={prevMonth} className="button-secondary min-h-0 p-2" aria-label="Previous month"><ChevronLeft size={16} /></button>
-              <button type="button" onClick={goToToday} className="button-secondary min-h-0 px-3 py-1.5 text-xs">Today</button>
-              <button type="button" onClick={nextMonth} className="button-secondary min-h-0 p-2" aria-label="Next month"><ChevronRight size={16} /></button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Agenda view */}
-      {view === "agenda" ? (
-        <div>
-          {events.length ? (
-            <div className="space-y-3">{events.map(eventCard)}</div>
-          ) : (
-            <div className="empty-state surface">
-              <h2 className="font-semibold">Your calendar is clear</h2>
-              <p>Add an event above to start building your agenda.</p>
+      {view === "agenda" && (
+        <>
+          <DayGroups groups={groupByDay(upcomingItems)} todayKey={todayKey} emptyText="Your calendar is clear. Create an event to start building your agenda." />
+          {pastItems.length > 0 && (
+            <div className="mt-5">
+              <button type="button" onClick={() => setShowPast((shown) => !shown)} className="issue-timeline-more">{showPast ? "Hide past events" : "Show " + pastItems.length + " past " + (pastItems.length === 1 ? "event" : "events")}</button>
+              {showPast && <DayGroups groups={groupByDay(pastItems).reverse()} todayKey={todayKey} />}
             </div>
           )}
-        </div>
+        </>
+      )}
 
-      /* Month view */
-      ) : view === "month" ? (
-        <div className="surface overflow-hidden">
-          <div className="grid grid-cols-7 border-b bg-[var(--surface-muted)] text-center text-xs font-semibold text-[var(--muted)]">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div key={day} className="p-3">{day}</div>
-            ))}
+      {view === "month" && (
+        <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)]">
+          <div className="grid grid-cols-7 border-b border-[var(--line)] bg-[var(--surface-muted)] text-center text-[11px] font-semibold text-[var(--muted)] sm:text-xs">
+            {weekdays.map((day) => <div key={day} className="px-0.5 py-2 sm:p-2.5"><span className="sm:hidden">{day.slice(0, 1)}</span><span className="hidden sm:inline">{day}</span></div>)}
           </div>
           <div className="grid grid-cols-7">
-            {Array.from({ length: monthDays.start.getDay() }).map((_, index) => (
-              <div key={"empty-" + index} className="min-h-24 border-b border-r bg-[var(--surface-muted)]/50" />
-            ))}
-            {monthDays.days.map((date) => (
-              <div key={date.toISOString()} className="min-h-24 border-b border-r p-2">
-                <p className={
-                  date.toDateString() === today.toDateString()
-                    ? "grid h-6 w-6 place-items-center rounded-full bg-[var(--accent)] text-xs font-semibold text-[var(--on-accent)]"
-                    : "text-xs font-semibold text-[var(--muted)]"
-                }>
-                  {date.getDate()}
-                </p>
-                <div className="mt-2 space-y-1">
-                  {eventsForDay(date).slice(0, 2).map((event) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      onClick={() => setSelectedId(event.id)}
-                      className="block w-full truncate rounded bg-[var(--accent)] px-1.5 py-1 text-left text-xs text-[var(--on-accent)] opacity-80 hover:opacity-100"
-                    >
-                      {event.title}
+            {Array.from({ length: weekdayOfKey(monthStart) }).map((_, index) => <div key={"empty-" + index} className="min-h-14 border-b border-r border-[var(--line)] bg-[var(--surface-muted)] opacity-50 sm:min-h-24" />)}
+            {Array.from({ length: daysInMonthOfKey(monthStart) }, (_, index) => addDaysToKey(monthStart, index)).map((day) => {
+              const dayItems = byDay.get(day) ?? []
+              return (
+                <div key={day} className="group min-h-14 min-w-0 border-b border-r border-[var(--line)] p-1 sm:min-h-24 sm:p-1.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <button type="button" onClick={() => openDay(day)} aria-label={"Open " + formatKeyLong(day)} className={day === todayKey ? "grid h-6 w-6 place-items-center rounded-full bg-[var(--accent)] text-xs font-semibold text-[var(--on-accent)]" : "grid h-6 w-6 place-items-center rounded-full text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface-muted)]"}>
+                      {Number(day.slice(8))}
                     </button>
-                  ))}
-                  {eventsForDay(date).length > 2 && (
-                    <p className="text-[10px] text-[var(--muted)]">+{eventsForDay(date).length - 2} more</p>
+                    <Link href={"/calendar/new?date=" + day} aria-label={"New event on " + formatKeyLong(day)} className="hidden rounded p-0.5 text-[var(--muted)] opacity-0 hover:bg-[var(--surface-muted)] focus:opacity-100 group-hover:opacity-100 sm:block"><Plus size={13} /></Link>
+                  </div>
+                  {/* Phones: coloured dots, tap the day for the list. */}
+                  {dayItems.length > 0 && (
+                    <button type="button" onClick={() => openDay(day)} className="mt-1 flex flex-wrap gap-0.5 sm:hidden" aria-label={dayItems.length + " events on " + formatKeyLong(day)}>
+                      {dayItems.slice(0, 4).map((item) => <span key={item.key} className="tag-chip" data-tone={item.google ? "teal" : colorTone(item.color)} style={{ width: 6, height: 6, padding: 0, background: "var(--tag)" }} />)}
+                    </button>
                   )}
+                  <div className="mt-1 hidden space-y-1 sm:block">
+                    {dayItems.slice(0, 2).map((item) => <MonthChip key={item.key} item={item} />)}
+                    {dayItems.length > 2 && <button type="button" onClick={() => openDay(day)} className="text-[11px] text-[var(--muted)] hover:underline">+{dayItems.length - 2} more</button>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        </div>
-
-      /* Week / Day view */
-      ) : (
-        <div className="surface p-6">
-          <p className="text-sm text-[var(--muted)]">
-            {view === "week" ? "Weekly view" : "Day view"} for your schedule.
-          </p>
-          {events.length ? (
-            <div className="mt-5 space-y-3">{events.slice(0, view === "week" ? 7 : 3).map(eventCard)}</div>
-          ) : (
-            <p className="mt-3 text-sm text-[var(--muted)]">No events in this view.</p>
-          )}
         </div>
       )}
 
-      {/* Event detail drawer */}
-      {selected && (
-        <aside className="surface mt-4 border-[var(--accent)] p-5" aria-label="Event details">
-          <div className="toolbar">
-            <div>
-              <p className="eyebrow">Event drawer</p>
-              <h3 className="mt-1 text-lg font-semibold">Edit event{selected.recurrence_rule ? " series" : ""}</h3>
-            </div>
-            <button type="button" onClick={() => setSelectedId(null)} className="button-quiet min-h-0 px-2 py-1 text-xs">Close</button>
-          </div>
+      {view === "week" && <DayGroups groups={weekDays.map((day) => [day, byDay.get(day) ?? []])} todayKey={todayKey} />}
 
-          <form action={updateEvent} className="mt-5 grid gap-3 sm:grid-cols-2">
-            <input type="hidden" name="id" value={selectedSourceId} />
-            <label className="field-label sm:col-span-2">Title<input required name="title" defaultValue={selected.title} className="field-control" /></label>
-            <label className="field-label sm:col-span-2">Description<textarea name="description" defaultValue={selected.description} maxLength={1000} className="field-control min-h-24 resize-y" /></label>
-            <label className="field-label">Starts<DateTimePicker name="startsAt" defaultValue={localDateTime(selected.starts_at)} required /></label>
-            <label className="field-label">Ends<DateTimePicker name="endsAt" defaultValue={localDateTime(selected.ends_at)} required /></label>
-            <label className="field-label">Repeat<Select name="recurrence" defaultValue={selected.recurrence_rule ?? ""} className="field-control" options={[{ value: "", label: "Does not repeat" }, { value: "daily", label: "Daily" }, { value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }]} /></label>
-            <label className="field-label">Reminder<Select name="reminder" defaultValue={String(selected.reminder_minutes ?? 0)} className="field-control" options={[{ value: "0", label: "No reminder" }, { value: "10", label: "10 minutes before" }, { value: "30", label: "30 minutes before" }, { value: "1440", label: "1 day before" }]} /></label>
-            <label className="field-label">Color<Select name="color" defaultValue={selected.color} className="field-control" options={[{ value: "indigo", label: "Neutral" }, { value: "blue", label: "Blue" }, { value: "emerald", label: "Emerald" }, { value: "rose", label: "Rose" }]} /></label>
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <button className="button-primary">Save changes</button>
-            </div>
-          </form>
-
-          <section className="mt-6 border-t pt-5">
-            <p className="eyebrow">Attendees</p>
-            <div className="mt-3 space-y-2">
-              {selectedAttendees.length ? selectedAttendees.map((attendee) => (
-                <div key={attendee.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate">{attendeeLabel(attendee)}</span>
-                  <span className="text-xs capitalize text-[var(--muted)]">{attendee.response}</span>
-                  {canManageAttendees && (
-                    <form action={removeEventAttendee}>
-                      <input type="hidden" name="eventId" value={selectedSourceId} />
-                      <input type="hidden" name="id" value={attendee.id} />
-                      <button className="text-xs text-[var(--muted)] hover:text-red-500">Remove</button>
-                    </form>
-                  )}
-                  {(attendee.user_id === currentUserId || attendee.email === currentUserEmail.toLowerCase()) && (
-                    <form action={respondEventAttendee} className="flex items-center gap-1">
-                      <input type="hidden" name="id" value={attendee.id} />
-                      <Select name="response" defaultValue={attendee.response} className="field-control min-h-0 px-2 py-1 text-xs" options={[{ value: "pending", label: "Pending" }, { value: "accepted", label: "Accept" }, { value: "declined", label: "Decline" }]} />
-                      <button className="button-quiet min-h-0 px-2 py-1 text-xs">Save</button>
-                    </form>
-                  )}
-                </div>
-              )) : <p className="text-sm text-[var(--muted)]">No attendees yet.</p>}
-            </div>
-            {canManageAttendees && (
-              <form action={addEventAttendee} className="mt-3 grid gap-2 sm:grid-cols-2">
-                <input type="hidden" name="eventId" value={selectedSourceId} />
-                <Select name="userId" defaultValue="" className="field-control" options={[{ value: "", label: "Invite workspace member" }, ...members.filter((member) => !selectedAttendees.some((attendee) => attendee.user_id === member.user_id)).map((member) => ({ value: member.user_id, label: "Member " + member.user_id.slice(0, 8) }))]} />
-                <div className="flex gap-2">
-                  <input type="email" name="email" placeholder="Or external email" className="field-control" />
-                  <button className="button-secondary">Add</button>
-                </div>
-              </form>
-            )}
-          </section>
-
-          <form action={deleteEvent} className="mt-5">
-            <input type="hidden" name="id" value={selectedSourceId} />
-            <button className="button-quiet min-h-0 px-3 py-2 text-xs text-red-500">Delete event series</button>
-          </form>
-        </aside>
+      {view === "day" && (
+        <>
+          <DayGroups groups={[[cursor, byDay.get(cursor) ?? []]]} todayKey={todayKey} />
+          <Link href={"/calendar/new?date=" + cursor} className="button-secondary mt-4 min-h-0 px-3 py-1.5 text-sm"><Plus size={14} className="mr-1.5" />New event on this day</Link>
+        </>
       )}
     </section>
   )

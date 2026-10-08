@@ -12,8 +12,10 @@ import {
 } from "./_actions/spaces";
 import { selectWorkspace } from "./_actions/workspaces";
 import { markAllNotificationsRead } from "@/app/(dashboard)/notifications/actions";
-import { getStorageForWorkspace } from "@/lib/storage/storage"
+import { DriveNotConnectedError, getStorageForWorkspace } from "@/lib/storage/storage"
 import { clearWorkspaceDriveConnection, isGoogleInvalidGrant } from "@/lib/google-drive-auth";
+import { listMyInvitations } from "@/lib/invitations";
+import { InvitationBanner } from "@/components/invitation-banner";
 
 export default async function DashboardLayout({
   children,
@@ -51,7 +53,7 @@ export default async function DashboardLayout({
       .order("created_at"),
     context.supabase
       .from("profiles")
-      .select("display_name,avatar_google_file_id,updated_at")
+      .select("display_name,avatar_google_file_id,avatar_workspace_id,updated_at")
       .eq("id", context.user.id)
       .maybeSingle(),
     context.supabase
@@ -117,12 +119,17 @@ export default async function DashboardLayout({
   let storageLimitBytes = Number(
     workspaceSettings?.storage_limit_bytes ?? 107374182400,
   );
+  let driveConnected = true;
   try {
     const driveUsage = await getStorageForWorkspace(context.workspaceId).getUsage();
     storageBytes = driveUsage.usedBytes;
     storageLimitBytes = driveUsage.limitBytes ?? storageLimitBytes;
   } catch (error) {
-    if (isGoogleInvalidGrant(error)) {
+    if (error instanceof DriveNotConnectedError) {
+      driveConnected = false;
+    } else if (isGoogleInvalidGrant(error)) {
+      // The refresh token was revoked or expired; drop it so the sidebar prompts a reconnect.
+      driveConnected = false;
       try {
         await clearWorkspaceDriveConnection(context.workspaceId)
       } catch (clearError) {
@@ -132,7 +139,10 @@ export default async function DashboardLayout({
       console.error("Could not load Google Drive storage quota")
     }
   }
-  const avatarUrl = profile?.avatar_google_file_id
+  const invitations = await listMyInvitations(context.supabase);
+  // Skip the avatar request when it lives in this workspace's Drive and that Drive is disconnected.
+  const avatarUnavailable = !driveConnected && profile?.avatar_workspace_id === context.workspaceId;
+  const avatarUrl = profile?.avatar_google_file_id && !avatarUnavailable
     ? "/api/profile/avatar?v=" + encodeURIComponent(profile.updated_at ?? "")
     : null;
 
@@ -158,6 +168,7 @@ export default async function DashboardLayout({
         activity: activity.count ?? 0,
         storageBytes,
         storageLimitBytes,
+        driveConnected,
       }}
       spaces={spaces ?? []}
       notifications={recentNotifications ?? []}
@@ -170,6 +181,7 @@ export default async function DashboardLayout({
       signOut={signOut}
       markAllRead={markAllNotificationsRead}
     >
+      <InvitationBanner invitations={invitations} />
       {children}
     </SidebarLayout>
   );

@@ -48,6 +48,8 @@ export default function ResetPasswordPage() {
       return
     }
 
+    // End every other session, so whoever triggered the reset elsewhere is logged out.
+    await supabase.auth.signOut({ scope: "others" })
     router.push("/login?success=Password+updated+successfully.+Please+sign+in.")
   }
 

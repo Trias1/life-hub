@@ -1,70 +1,220 @@
 import Link from "next/link"
+import { Bookmark, CalendarDays, CircleDot, Database, SquarePen } from "lucide-react"
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { relativeTime } from "@/lib/relative-time"
 
-function stripHtml(html: string) {
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+const TIME_ZONE = "Asia/Jakarta"
+const DAY_MS = 24 * 60 * 60 * 1000
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+const dayKeyFormat = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" })
+const longDate = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, weekday: "long", day: "numeric", month: "long" })
+const weekdayShort = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, weekday: "short" })
+const dayOfMonth = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, day: "numeric" })
+const timeOfDay = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" })
+const shortDay = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, day: "numeric", month: "short" })
+
+/** Midnight in Jakarta for the day containing `date`. */
+function jakartaMidnight(date: Date) {
+  return new Date(dayKeyFormat.format(date) + "T00:00:00+07:00")
 }
 
 function formatBytes(value: number) {
   if (value < 1024) return value + " B"
-  if (value < 1024 * 1024) return (value / 1024).toFixed(1) + " KB"
+  if (value < 1024 * 1024) return Math.round(value / 1024) + " KB"
   if (value < 1024 * 1024 * 1024) return (value / (1024 * 1024)).toFixed(1) + " MB"
   return (value / (1024 * 1024 * 1024)).toFixed(1) + " GB"
 }
 
+function greeting(now: Date) {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now))
+  return hour < 11 ? "Good morning" : hour < 15 ? "Good afternoon" : hour < 19 ? "Good evening" : "Good night"
+}
+
+const plural = (count: number, one: string, many = one + "s") => count + " " + (count === 1 ? one : many)
+
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ space?: string | string[] }> }) {
   const context = await getWorkspaceContext()
   if (!context) return null
-  const supabase = context.supabase
-  const workspaceId = context.workspaceId
-  const user = context.user
+  const { supabase, workspaceId, user } = context
   const now = new Date()
-  const nowIso = now.toISOString()
-  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  const today = jakartaMidnight(now)
+  const todayKey = dayKeyFormat.format(now)
+  const weekStart = new Date(today.getTime() - WEEKDAYS.indexOf(weekdayShort.format(now)) * DAY_MS)
+  const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS)
+  const weekEndKey = dayKeyFormat.format(new Date(weekEnd.getTime() - 1))
+  const activityStart = new Date(today.getTime() - 6 * DAY_MS)
   const params = await searchParams
   const requestedSpace = typeof params.space === "string" ? params.space : ""
   const spaceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedSpace) ? requestedSpace : null
-  const tasksQuery = supabase.from("tasks").select("id,title,status,due_date", { count: "exact" }).eq("workspace_id", workspaceId).eq("status", "todo").is("deleted_at", null)
-  const notesQuery = supabase.from("notes").select("id,title,content,folder,updated_at", { count: "exact" }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null)
-  const filesQuery = supabase.from("files").select("id,name,mime_type,size_bytes,updated_at", { count: "exact" }).eq("workspace_id", workspaceId).is("trashed_at", null)
-  const recentNotesQuery = supabase.from("notes").select("id,title,content,folder,updated_at").eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null)
-  const recentFilesQuery = supabase.from("files").select("id,name,updated_at").eq("workspace_id", workspaceId).is("trashed_at", null)
-  const storageFilesQuery = supabase.from("files").select("size_bytes").eq("workspace_id", workspaceId).is("trashed_at", null)
+
+  let openTasksQuery = supabase.from("tasks").select("id,title,status,priority,due_date", { count: "exact" }).eq("workspace_id", workspaceId).in("status", ["todo", "in_progress", "review"]).is("deleted_at", null)
+  let doneTasksQuery = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "done").is("deleted_at", null).gte("completed_at", weekStart.toISOString())
+  // Counts run as separate head queries: the lists below are capped for display.
+  let overdueQuery = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).in("status", ["todo", "in_progress", "review"]).is("deleted_at", null).lt("due_date", todayKey)
+  let dueSoonQuery = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).in("status", ["todo", "in_progress", "review"]).is("deleted_at", null).gte("due_date", todayKey).lte("due_date", weekEndKey)
+  let editedNotesQuery = supabase.from("notes").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).gte("updated_at", weekStart.toISOString())
+  let notesQuery = supabase.from("notes").select("id,title,updated_at", { count: "exact" }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null)
+  let storageQuery = supabase.from("files").select("size_bytes").eq("workspace_id", workspaceId).is("trashed_at", null)
   if (spaceId) {
-    tasksQuery.eq("space_id", spaceId)
-    notesQuery.eq("space_id", spaceId)
-    filesQuery.eq("space_id", spaceId)
-    recentNotesQuery.eq("space_id", spaceId)
-    recentFilesQuery.eq("space_id", spaceId)
-    storageFilesQuery.eq("space_id", spaceId)
+    openTasksQuery = openTasksQuery.eq("space_id", spaceId)
+    doneTasksQuery = doneTasksQuery.eq("space_id", spaceId)
+    overdueQuery = overdueQuery.eq("space_id", spaceId)
+    dueSoonQuery = dueSoonQuery.eq("space_id", spaceId)
+    editedNotesQuery = editedNotesQuery.eq("space_id", spaceId)
+    notesQuery = notesQuery.eq("space_id", spaceId)
+    storageQuery = storageQuery.eq("space_id", spaceId)
   }
-  const [tasks, events, notes, files, unread, activity, recentNotes, recentFiles, upcomingEvents, storageFiles, members, profile] = await Promise.all([
-    tasksQuery.order("due_date", { ascending: true, nullsFirst: false }).limit(4),
-    supabase.from("calendar_events").select("id,title,starts_at,ends_at", { count: "exact" }).eq("workspace_id", workspaceId).gte("starts_at", nowIso).lte("starts_at", nextWeek).order("starts_at", { ascending: true }).limit(4),
+
+  const [openTasks, doneTasks, overdueTasks, dueSoonTasks, editedNotes, weekEvents, notes, activity, storageFiles, settings, bookmarks, profile] = await Promise.all([
+    openTasksQuery.order("due_date", { ascending: true, nullsFirst: false }).limit(5),
+    doneTasksQuery,
+    overdueQuery,
+    dueSoonQuery,
+    editedNotesQuery,
+    supabase.from("calendar_events").select("id,title,starts_at,ends_at").eq("workspace_id", workspaceId).gte("starts_at", weekStart.toISOString()).lt("starts_at", weekEnd.toISOString()).order("starts_at", { ascending: true }).limit(50),
     notesQuery.order("updated_at", { ascending: false }).limit(4),
-    filesQuery.order("updated_at", { ascending: false }).limit(4),
-    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("recipient_id", user.id).eq("is_read", false),
-    supabase.from("activity_logs").select("id,action,entity_type,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(5),
-    recentNotesQuery.order("updated_at", { ascending: false }).limit(3),
-    recentFilesQuery.order("updated_at", { ascending: false }).limit(3),
-    supabase.from("calendar_events").select("id,title,starts_at,ends_at").eq("workspace_id", workspaceId).gte("starts_at", nowIso).order("starts_at", { ascending: true }).limit(4),
-    storageFilesQuery,
-    supabase.from("workspace_members").select("user_id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("activity_logs").select("created_at").eq("workspace_id", workspaceId).gte("created_at", activityStart.toISOString()).order("created_at", { ascending: false }).limit(1000),
+    storageQuery,
+    supabase.from("workspace_settings").select("storage_limit_bytes").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("bookmarks").select("id,title").eq("workspace_id", workspaceId).eq("is_favorite", true).is("archived_at", null).order("updated_at", { ascending: false }).limit(3),
     supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
   ])
-  const displayName = profile.data?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "there"
-  const storageBytes = (storageFiles.data ?? []).reduce((total, file) => total + Number(file.size_bytes ?? 0), 0)
-  const continueItems = [
-    ...(tasks.data ?? []).map((item) => ({ id: item.id, title: item.title, type: "Task", detail: item.due_date ? "Due " + item.due_date : "Open task", time: item.due_date ? new Date(item.due_date).getTime() : 0 })),
-    ...(recentNotes.data ?? []).map((item) => ({ id: item.id, title: item.title, type: "Note", detail: stripHtml(item.content) || "No content yet", time: new Date(item.updated_at).getTime() })),
-    ...(recentFiles.data ?? []).map((item) => ({ id: item.id, title: item.name, type: "File", detail: "Workspace file", time: new Date(item.updated_at).getTime() })),
-  ].sort((a, b) => b.time - a.time).slice(0, 5)
-  const cards = [
-    { label: "Open tasks", value: tasks.count ?? 0, detail: tasks.data?.filter((item) => item.due_date).length + " with due dates", href: "/tasks" },
-    { label: "Upcoming events", value: events.count ?? 0, detail: "Next 7 days", href: "/calendar" },
-    { label: "Active notes", value: notes.count ?? 0, detail: "Updated recently", href: "/notes" },
-    { label: "Workspace files", value: files.count ?? 0, detail: formatBytes(storageBytes) + " stored", href: "/files" },
-  ]
 
-  return <div className="page-container"><header data-dashboard-widget="welcome" className="page-header"><div><p className="eyebrow">Workspace overview</p><h1 className="page-title">Good to see you, {displayName}.</h1><p className="page-description">Pick up where you left off or make one small thing useful today.</p></div><span className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-700">{unread.count ?? 0} unread</span></header><section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <Link key={card.label} href={card.href} data-dashboard-widget={card.label} className="surface metric-card block h-32 overflow-hidden transition hover:-translate-y-0.5"><p className="metric-label">{card.label}</p><p className="metric-value">{card.value}</p><p className="mt-2 text-xs text-zinc-400">{card.detail}</p></Link>)}</section><section className="mt-8 grid gap-4 md:grid-cols-[1.35fr_0.65fr]"><article className="surface flex h-[360px] min-h-0 flex-col overflow-hidden p-6"><div className="toolbar shrink-0"><div><p className="eyebrow">Continue working</p><h2 className="mt-1 text-lg font-semibold">Your latest workspace context</h2></div><Link href="/notes" className="button-quiet min-h-0 px-2 py-1 text-xs">Open notes</Link></div>{continueItems.length ? <div className="mt-5 min-h-0 flex-1 overflow-y-auto space-y-2">{continueItems.map((item) => <Link key={item.type + item.id} href={item.type === "Note" ? "/notes?note=" + item.id : item.type === "Task" ? "/tasks" : "/files"} className="flex items-center gap-3 rounded-xl border p-3 transition hover:bg-[var(--surface-muted)]"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--surface-muted)] text-xs font-bold text-[var(--accent)]">{item.type.slice(0, 1)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="mt-1 block truncate text-xs text-zinc-500">{item.detail}</span></span><span className="text-xs text-zinc-400">{item.type}</span></Link>)}</div> : <div className="empty-state mt-5"><h3 className="font-semibold">Nothing to continue yet</h3><p>Create a note or task to start your workspace trail.</p></div>}</article><article className="surface-muted h-[360px] overflow-hidden p-6"><p className="eyebrow">Quick actions</p><h2 className="mt-1 text-lg font-semibold">Make progress quickly</h2><p className="mt-3 text-sm leading-6 text-zinc-500">Keep capture lightweight; details can come later.</p><div className="mt-5 grid gap-2"><Link href="/notes" className="button-primary">Create a note</Link><Link href="/tasks" className="button-secondary">Add a task</Link><Link href="/calendar" className="button-secondary">Plan an event</Link></div></article></section><section className="mt-8 grid gap-4 md:grid-cols-2"><article className="surface flex h-[360px] min-h-0 flex-col overflow-hidden p-6"><div className="toolbar shrink-0"><div><p className="eyebrow">Recent notes</p><h2 className="mt-1 text-lg font-semibold">Ideas worth reopening</h2></div><Link href="/notes" className="button-quiet min-h-0 px-2 py-1 text-xs">View all</Link></div>{recentNotes.data?.length ? <div className="mt-5 min-h-0 flex-1 overflow-y-auto space-y-3">{recentNotes.data.map((note) => <Link key={note.id} href={["/notes?note=", note.id].join("")} className="block rounded-xl border p-3 transition hover:bg-[var(--surface-muted)]"><p className="truncate text-sm font-semibold">{note.title}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{stripHtml(note.content) || "No content yet."}</p><p className="mt-2 text-[11px] text-zinc-400">Updated {new Date(note.updated_at).toLocaleDateString()} · {note.folder}</p></Link>)}</div> : <p className="mt-5 text-sm text-zinc-500">Your recent notes will appear here.</p>}</article><article className="surface flex h-[360px] min-h-0 flex-col overflow-hidden p-6"><div className="toolbar shrink-0"><div><p className="eyebrow">Upcoming events</p><h2 className="mt-1 text-lg font-semibold">What is next</h2></div><Link href="/calendar" className="button-quiet min-h-0 px-2 py-1 text-xs">Calendar</Link></div>{upcomingEvents.data?.length ? <div className="mt-5 min-h-0 flex-1 overflow-y-auto space-y-3">{upcomingEvents.data.map((event) => <Link key={event.id} href="/calendar" className="flex items-center gap-3 rounded-xl border p-3 transition hover:bg-[var(--surface-muted)]"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--surface-muted)] text-xs font-bold text-[var(--accent)]">{new Date(event.starts_at).getDate()}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{event.title}</span><span className="mt-1 block text-xs text-zinc-500">{new Date(event.starts_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span></span></Link>)}</div> : <p className="mt-5 text-sm text-zinc-500">No upcoming events scheduled.</p>}</article></section><section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]"><article data-dashboard-widget="activity" className="surface p-6"><div className="toolbar"><div><p className="eyebrow">Activity feed</p><h2 className="mt-1 text-lg font-semibold">Recent workspace movement</h2></div><Link href="/activity" className="button-quiet min-h-0 px-2 py-1 text-xs">View activity</Link></div>{activity.data?.length ? <div className="mt-5 space-y-3">{activity.data.map((item) => <div key={item.id} className="border-b border-zinc-200 pb-3 last:border-0 last:pb-0"><p className="text-sm font-medium">{item.action} <span className="font-normal text-zinc-400">· {item.entity_type}</span></p><p className="mt-1 text-xs text-zinc-500">{new Date(item.created_at).toLocaleString()}</p></div>)}</div> : <p className="mt-5 text-sm text-zinc-500">Your recent workspace activity will appear here.</p>}</article><article className="surface-muted p-6"><p className="eyebrow">Workspace health</p><h2 className="mt-1 text-lg font-semibold">A quick pulse</h2><div className="mt-5 space-y-4"><div><div className="flex items-center justify-between text-sm"><span className="text-zinc-500">Storage used</span><span className="font-semibold">{formatBytes(storageBytes)}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/60"><div className="h-full w-[12%] rounded-full bg-[var(--accent)]" /></div></div><div className="flex items-center justify-between border-t pt-4 text-sm"><span className="text-zinc-500">Workspace members</span><span className="font-semibold">{members.count ?? 0}</span></div><div className="flex items-center justify-between text-sm"><span className="text-zinc-500">Unread notifications</span><span className="font-semibold">{unread.count ?? 0}</span></div></div></article></section></div>
+  const displayName = profile.data?.display_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "there"
+  const openCount = openTasks.count ?? 0
+  const doneCount = doneTasks.count ?? 0
+  const focusTotal = openCount + doneCount
+  const dueThisWeek = dueSoonTasks.count ?? 0
+  const overdue = overdueTasks.count ?? 0
+  const eventCount = weekEvents.data?.length ?? 0
+  const storageBytes = (storageFiles.data ?? []).reduce((total, file) => total + Number(file.size_bytes ?? 0), 0)
+  const storageLimit = Number(settings.data?.storage_limit_bytes ?? 107374182400)
+  const storagePercent = storageLimit ? Math.min(100, (storageBytes / storageLimit) * 100) : 0
+  const notesThisWeek = editedNotes.count ?? 0
+
+  const week = WEEKDAYS.map((label, index) => {
+    const start = new Date(weekStart.getTime() + index * DAY_MS)
+    const end = new Date(start.getTime() + DAY_MS)
+    const events = (weekEvents.data ?? []).filter((event) => new Date(event.starts_at) >= start && new Date(event.starts_at) < end).length
+    return { key: dayKeyFormat.format(start), label, day: dayOfMonth.format(start), isToday: start.getTime() === today.getTime(), events }
+  })
+  const upcoming = (weekEvents.data ?? []).filter((event) => new Date(event.ends_at) >= now).slice(0, 3)
+
+  const activityDays = Array.from({ length: 7 }, (_, index) => {
+    const start = new Date(activityStart.getTime() + index * DAY_MS)
+    const end = new Date(start.getTime() + DAY_MS)
+    const count = (activity.data ?? []).filter((item) => new Date(item.created_at) >= start && new Date(item.created_at) < end).length
+    return { key: dayKeyFormat.format(start), label: weekdayShort.format(start), count, isToday: start.getTime() === today.getTime() }
+  })
+  const activityTotal = activityDays.reduce((total, day) => total + day.count, 0)
+  const activityMax = Math.max(1, ...activityDays.map((day) => day.count))
+
+  return (
+    <div className="page-container">
+      <header data-dashboard-widget="welcome" className="dash-head">
+        <div className="min-w-0">
+          <p className="text-sm text-[var(--muted)]">{longDate.format(now)}</p>
+          <h1 className="dash-greeting">{greeting(now)}, {displayName}</h1>
+        </div>
+        <nav aria-label="Create" className="dash-actions">
+          <Link href="/notes/new" className="button-secondary"><SquarePen size={15} aria-hidden />Note</Link>
+          <Link href="/tasks/new" className="button-secondary"><CircleDot size={15} aria-hidden />Task</Link>
+          <Link href="/calendar/new" className="button-secondary"><CalendarDays size={15} aria-hidden />Event</Link>
+        </nav>
+      </header>
+
+      <section aria-label="Overview" className="dash-stats">
+        <Link href="/tasks" className="dash-stat">
+          <span className="dash-stat-label"><CircleDot size={14} aria-hidden />Open tasks</span>
+          <strong>{openCount}</strong>
+          <span className={"dash-stat-note" + (overdue ? " is-alert" : "")}>{overdue ? overdue + " overdue" : dueThisWeek ? dueThisWeek + " due this week" : "Nothing due this week"}</span>
+        </Link>
+        <Link href="/calendar" className="dash-stat">
+          <span className="dash-stat-label"><CalendarDays size={14} aria-hidden />This week</span>
+          <strong>{eventCount}</strong>
+          <span className="dash-stat-note">{eventCount === 1 ? "event planned" : "events planned"}</span>
+        </Link>
+        <Link href="/notes" data-dashboard-widget="notes" className="dash-stat">
+          <span className="dash-stat-label"><SquarePen size={14} aria-hidden />Notes</span>
+          <strong>{notes.count ?? 0}</strong>
+          <span className="dash-stat-note">{notesThisWeek ? notesThisWeek + " edited this week" : "No edits this week"}</span>
+        </Link>
+        <Link href="/files" data-dashboard-widget="storage" className="dash-stat">
+          <span className="dash-stat-label"><Database size={14} aria-hidden />Storage</span>
+          <strong>{formatBytes(storageBytes)}</strong>
+          <span className="dash-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(storagePercent)} aria-label={"Storage used: " + formatBytes(storageBytes) + " of " + formatBytes(storageLimit)}><span style={{ width: Math.max(storagePercent, storageBytes ? 1.5 : 0) + "%" }} /></span>
+        </Link>
+      </section>
+
+      <div className="dash-cards">
+        <section data-dashboard-widget="tasks" className="dash-card dash-card-wide" aria-labelledby="dash-focus">
+          <div className="dash-card-head"><h2 id="dash-focus">Focus this week</h2><span>{focusTotal ? doneCount + " of " + focusTotal + " done" : "All clear"}</span></div>
+          <div className="dash-progress" aria-hidden><span style={{ width: (focusTotal ? (doneCount / focusTotal) * 100 : 0) + "%" }} /></div>
+          {openTasks.data?.length ? (
+            <ul className="dash-task-list">
+              {openTasks.data.map((task) => (
+                <li key={task.id}>
+                  <CircleDot size={15} className="shrink-0 text-[var(--muted)]" aria-hidden />
+                  <Link href={"/tasks/" + task.id} className="min-w-0 flex-1 truncate font-medium hover:underline">{task.title}</Link>
+                  <span className="dash-priority" data-priority={task.priority}>{task.priority}</span>
+                  {task.due_date && <span className={"dash-due" + (task.due_date < todayKey ? " is-overdue" : "")}>{shortDay.format(new Date(task.due_date + "T00:00:00+07:00"))}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="dash-empty">No open tasks. <Link href="/tasks/new">Create a task</Link></p>}
+        </section>
+
+        <section data-dashboard-widget="calendar" className="dash-card" aria-labelledby="dash-week">
+          <div className="dash-card-head"><h2 id="dash-week">This week</h2><Link href="/calendar">Calendar</Link></div>
+          <ol className="dash-week">
+            {week.map((day) => (
+              <li key={day.key}>
+                <Link href={"/calendar/new?date=" + day.key} className={"dash-day" + (day.isToday ? " is-today" : "")} aria-label={day.label + " " + day.day + (day.events ? ", " + plural(day.events, "event") : "") + (day.isToday ? ", today" : "")}>
+                  <span>{day.label}</span><strong>{day.day}</strong><i aria-hidden className={day.events ? "has-events" : ""} />
+                </Link>
+              </li>
+            ))}
+          </ol>
+          {upcoming.length ? (
+            <ul className="mt-3 space-y-2">
+              {upcoming.map((event) => (
+                <li key={event.id} className="flex min-w-0 items-baseline gap-2 text-sm"><span className="shrink-0 text-xs tabular-nums text-[var(--muted)]">{weekdayShort.format(new Date(event.starts_at))} {timeOfDay.format(new Date(event.starts_at))}</span><Link href={"/calendar/" + event.id} className="truncate font-medium hover:underline">{event.title}</Link></li>
+              ))}
+            </ul>
+          ) : <p className="mt-3 text-sm text-[var(--muted)]">Nothing planned. <Link href="/calendar/new" className="font-semibold text-[var(--foreground)] underline underline-offset-2">Plan an event</Link></p>}
+        </section>
+
+        <section data-dashboard-widget="activity" className="dash-card dash-card-wide" aria-labelledby="dash-activity">
+          <div className="dash-card-head"><h2 id="dash-activity">Activity, last 7 days</h2><Link href="/activity">{plural(activityTotal, "change")}</Link></div>
+          <ol className="dash-bars">
+            {activityDays.map((day) => (
+              <li key={day.key} title={day.label + ": " + plural(day.count, "change")}>
+                <span className="dash-bar-track"><span className={"dash-bar" + (day.isToday ? " is-today" : "")} style={{ height: Math.max(4, (day.count / activityMax) * 100) + "%" }} /></span>
+                <span className="dash-bar-label">{day.label}</span>
+                <span className="sr-only">{plural(day.count, "change")}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="dash-card" aria-labelledby="dash-notes">
+          <div className="dash-card-head"><h2 id="dash-notes">Recent notes</h2><Link href="/notes">View all</Link></div>
+          {notes.data?.length ? (
+            <ul className="dash-mini-list">
+              {notes.data.map((note) => (
+                <li key={note.id}><SquarePen size={14} aria-hidden /><Link href={"/notes/" + note.id} className="min-w-0 flex-1 truncate hover:underline">{note.title}</Link><time dateTime={note.updated_at}>{relativeTime(note.updated_at, now)}</time></li>
+              ))}
+            </ul>
+          ) : <p className="dash-empty">No notes yet. <Link href="/notes/new">Write a note</Link></p>}
+          {bookmarks.data?.length ? (
+            <ul className="dash-mini-list dash-bookmarks">
+              {bookmarks.data.map((bookmark) => (
+                <li key={bookmark.id}><Bookmark size={14} aria-hidden /><Link href={"/bookmarks/" + bookmark.id} className="min-w-0 flex-1 truncate hover:underline">{bookmark.title}</Link></li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      </div>
+    </div>
+  )
 }

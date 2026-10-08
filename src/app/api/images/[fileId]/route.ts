@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { getWorkspaceContext } from "@/lib/workspace/server"
-import { getStorageForWorkspace } from "@/lib/storage/storage"
+import { getStorageForWorkspace, storageResponseHeaders } from "@/lib/storage/storage"
+import { Readable } from "node:stream"
+
+export const runtime = "nodejs"
 
 export async function GET(
   _request: Request,
@@ -16,12 +19,7 @@ export async function GET(
 
   try {
     const image = await getStorageForWorkspace(context.workspaceId).download(fileId)
-    return new Response(image.body as unknown as BodyInit, {
-      headers: {
-        "Content-Type": image.mimeType,
-        "Cache-Control": "private, max-age=3600",
-      },
-    })
+    return new Response(Readable.toWeb(image.body) as ReadableStream, { headers: storageResponseHeaders(image, true) })
   } catch {
     return NextResponse.json({ error: "Image not found" }, { status: 404 })
   }

@@ -58,9 +58,6 @@ export async function uploadProfileAvatar(formData: FormData): Promise<void> {
   if (!context) actionFailure(returnPath, "access the active workspace")
   const storage = getStorageForWorkspace(context.workspaceId)
 
-  const { data: existingProfile, error: existingProfileError } = await context.supabase.from("profiles").select("avatar_url,avatar_google_file_id,avatar_workspace_id").eq("id", context.user.id).maybeSingle()
-  if (existingProfileError) actionFailure(returnPath, "load profile", existingProfileError)
-
   let uploaded: Awaited<ReturnType<typeof storage.upload>>
   try {
     const folderId = await storage.ensureFolder(["avatars"])
@@ -79,14 +76,7 @@ export async function uploadProfileAvatar(formData: FormData): Promise<void> {
     actionFailure(returnPath, "save profile photo", error)
   }
 
-  if (existingProfile?.avatar_google_file_id) {
-    try {
-      await getStorageForWorkspace(existingProfile.avatar_workspace_id ?? context.workspaceId).delete(existingProfile.avatar_google_file_id)
-    } catch (cleanupError) {
-      console.error("Could not remove previous Google Drive avatar")
-    }
-  }
-
+  // ponytail: old profile references are user-writable; reclaim orphan avatars only with trusted ownership metadata.
   revalidatePath("/profile")
   revalidatePath("/settings")
   redirect(returnPath)

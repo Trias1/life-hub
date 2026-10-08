@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const actions = readFileSync(new URL("./actions.ts", import.meta.url), "utf8");
-const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("./[id]/page.tsx", import.meta.url), "utf8");
 const workspace = readFileSync(
-  new URL("../../../components/notes-workspace.tsx", import.meta.url),
+  new URL("../../../components/notes/note-detail.tsx", import.meta.url),
   "utf8",
 );
 const deletePolicies = readFileSync(
@@ -45,9 +45,20 @@ test("trashed notes use creator-scoped RLS for permanent deletion", () => {
   assert.match(deletePolicies, /workspace_members/);
 });
 
-test("notes page exposes restore and permanent delete controls", () => {
-  assert.match(page, /restoreNote=\{restoreNote\}/);
-  assert.match(page, /deleteNotePermanently=\{deleteNotePermanently\}/);
+test("note detail page exposes restore and permanent delete controls", () => {
+  assert.match(page, /\brestoreNote\b[,\s}]/);
+  assert.match(page, /\bdeleteNotePermanently\b[,\s}]/);
   assert.match(workspace, />Restore<\/button>/);
   assert.match(workspace, />Delete permanently<\/button>/);
+});
+
+test("creating a note opens the new note instead of the list", () => {
+  const source = actionSource("createNote", "updateNote");
+  assert.match(source, /redirect\("\/notes\/" \+ note\.id/);
+});
+
+test("note edits stay scoped to the author in the active workspace", () => {
+  const source = actionSource("updateNote", "restoreNoteVersion");
+  assert.match(source, /eq\(["']workspace_id["'], context\.workspaceId\)/);
+  assert.match(source, /eq\(["']author_id["'], context\.user\.id\)/);
 });

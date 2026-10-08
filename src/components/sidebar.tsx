@@ -57,6 +57,7 @@ type SidebarProps = {
     activity: number;
     storageBytes: number;
     storageLimitBytes: number | null;
+    driveConnected: boolean;
   };
   spaces: Array<{ id: string; name: string; color: string }>;
   createSpace: CreateSpaceAction;
@@ -79,7 +80,8 @@ function formatBytes(bytes: number) {
 function WorkspaceOptionButton({
   name,
   active,
-}: { name: string; active: boolean }) {
+  joined = false,
+}: { name: string; active: boolean; joined?: boolean }) {
   const { pending } = useFormStatus()
   return (
     <button
@@ -87,7 +89,8 @@ function WorkspaceOptionButton({
       className={"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition " + (active ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]") + (pending ? " cursor-wait opacity-60" : "")}
     >
       <span className="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--accent)] text-[9px] font-bold text-[var(--on-accent)]">{name.slice(0, 1).toUpperCase()}</span>
-      <span className="flex-1 truncate text-left">{pending ? "Switching�" : name}</span>
+      <span className="flex-1 truncate text-left">{pending ? "Switching…" : name}</span>
+      {joined && !pending && <span className="shrink-0 rounded-full border border-[var(--line)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">Joined</span>}
       {active && !pending && <Check size={11} className="shrink-0" />}
     </button>
   )
@@ -132,6 +135,7 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [spaceModal, setSpaceModal] = useState(false);
@@ -243,11 +247,20 @@ export function Sidebar({
                 <div className="absolute left-3 right-3 top-full z-50 mt-1 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2 shadow-xl">
                   <p className="truncate px-2 py-1 text-[11px] text-[var(--muted)]">{user.email}</p>
                   <div className="my-1 border-t border-[var(--line)]" />
-                  {workspaces.map((ws) => (
-                    <form key={ws.id} action={selectWorkspace} onSubmit={() => { window.setTimeout(() => window.location.reload(), 1500) }}>
-                      <input type="hidden" name="workspaceId" value={ws.id} />
-                      <WorkspaceOptionButton name={ws.name} active={ws.id === workspace.id} />
-                    </form>
+                  {/* Owned workspaces first, then ones the user joined through an invitation, like Slack. */}
+                  {[
+                    { heading: "Your workspaces", items: workspaces.filter((ws) => ws.owner_id === user.id) },
+                    { heading: "Joined", items: workspaces.filter((ws) => ws.owner_id !== user.id) },
+                  ].filter((group) => group.items.length).map((group) => (
+                    <div key={group.heading} className="py-0.5">
+                      <p className="px-2 pb-0.5 pt-1 text-[10px] font-semibold text-[var(--muted)]">{group.heading}</p>
+                      {group.items.map((ws) => (
+                        <form key={ws.id} action={selectWorkspace} onSubmit={() => { window.setTimeout(() => window.location.reload(), 1500) }}>
+                          <input type="hidden" name="workspaceId" value={ws.id} />
+                          <WorkspaceOptionButton name={ws.name} active={ws.id === workspace.id} joined={ws.owner_id !== user.id} />
+                        </form>
+                      ))}
+                    </div>
                   ))}
                   <div className="my-1 border-t border-[var(--line)]" />
                   <button type="button" onClick={() => { setWorkspaceSwitcherOpen(false); setWorkspaceModal(true); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-[var(--muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"><Plus size={13} /><span>New workspace</span></button>
@@ -342,6 +355,20 @@ export function Sidebar({
                     }}
                   />
                 </div>
+                {!counts.driveConnected && (
+                  <div role="alert" className="drive-alert mt-3 rounded-xl border p-2.5 text-[11px] leading-4">
+                    <p className="font-semibold">Google Drive disconnected</p>
+                    <p className="mt-1 opacity-80">Uploads and previews are paused until you reconnect.</p>
+                    {workspace.isOwner ? (
+                      // Plain anchor: this route redirects to Google OAuth, which client-side navigation can't fetch.
+                      <a href="/api/auth/google/login" className="mt-2 inline-block font-semibold underline underline-offset-2">
+                        Connect Google Drive
+                      </a>
+                    ) : (
+                      <p className="mt-2 font-semibold">Ask a workspace admin to reconnect it.</p>
+                    )}
+                  </div>
+                )}
                 <Link
                   href="/files"
                   className="mt-3 block text-xs font-semibold text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -366,13 +393,14 @@ export function Sidebar({
             aria-label="Open profile menu"
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--on-accent)]">
-              {user.avatarUrl ? (
+              {user.avatarUrl && user.avatarUrl !== failedAvatarUrl ? (
                 <Image
                   src={user.avatarUrl}
                   alt=""
                   width={36}
                   height={36}
                   unoptimized
+                  onError={() => setFailedAvatarUrl(user.avatarUrl)}
                   className="h-full w-full object-cover"
                 />
               ) : (

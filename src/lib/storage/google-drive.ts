@@ -8,6 +8,13 @@ const FOLDER_MIME = "application/vnd.google-apps.folder"
 type DriveFile = { id?: string | null; name?: string | null; mimeType?: string | null; size?: string | null; webViewLink?: string | null }
 type Drive = ReturnType<typeof google.drive>
 
+export class DriveNotConnectedError extends Error {
+  constructor() {
+    super("Google Drive is not connected for this workspace. Open Settings > Integrations first.")
+    this.name = "DriveNotConnectedError"
+  }
+}
+
 function required(name: string) {
   const value = process.env[name]
   if (!value) throw new Error("Missing required storage configuration: " + name)
@@ -30,7 +37,7 @@ function serviceAccountClient() {
 
 async function workspaceClient(workspaceId: string) {
   const connection = await getWorkspaceDriveConnection(workspaceId)
-  if (!connection?.refresh_token) throw new Error("Google Drive is not connected for this workspace. Open Settings > Integrations first.")
+  if (!connection?.refresh_token) throw new DriveNotConnectedError()
   const auth = createGoogleOAuthClient()
   auth.setCredentials({ refresh_token: connection.refresh_token })
   return { drive: google.drive({ version: "v3", auth }), connection }
@@ -75,7 +82,9 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
   async function ensureFolder(pathParts: string[]) {
     const { drive, connection } = await driveForRequest()
     let parentId = await rootFolder(drive, connection)
-    for (const part of pathParts) {
+    const scopedParts = workspaceId && pathParts[0] !== "workspaces" ? ["workspaces", workspaceId, ...pathParts] : pathParts
+    if (workspaceId && scopedParts[1] !== workspaceId) throw new Error("Invalid workspace folder")
+    for (const part of scopedParts) {
       const existing = await findFolder(drive, part, parentId)
       parentId = existing?.id ?? (await createFolderWithDrive(drive, part, parentId)).id
     }
@@ -112,21 +121,34 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     }
   }
 
-  async function makePublic(fileId: string) {
-    const { drive } = await driveForRequest()
-    await drive.permissions.create({ fileId, requestBody: { type: "anyone", role: "reader" }, supportsAllDrives: true })
+  async function assertWorkspaceObject(drive: Drive, connection: Awaited<ReturnType<typeof workspaceClient>>["connection"] | null, fileId: string, destination = false) {
+    if (!/^[a-zA-Z0-9_-]{1,256}$/.test(fileId)) throw new Error("Invalid file id")
+    if (workspaceId) {
+      const rootId = connection?.root_folder_id
+      if (!rootId) throw new Error("Workspace folder not found")
+      const workspaces = await findFolder(drive, "workspaces", rootId)
+      const folder = workspaces?.id ? await findFolder(drive, workspaceId, workspaces.id) : null
+      if (!folder?.id) throw new Error("Workspace folder not found")
+      if (destination) {
+        const { data } = await drive.files.get({ fileId, fields: "mimeType,trashed", supportsAllDrives: true })
+        if (data.trashed || data.mimeType !== FOLDER_MIME) throw new Error("Invalid destination folder")
+      }
+      if (!destination || fileId !== folder.id) await assertDescendant(drive, fileId, folder.id)
+    }
   }
 
   async function download(fileId: string): Promise<StorageDownload> {
-    const { drive } = await driveForRequest()
+    const { drive, connection } = await driveForRequest()
+    await assertWorkspaceObject(drive, connection, fileId)
     const metadata = await drive.files.get({ fileId, fields: "id,name,mimeType,size", supportsAllDrives: true })
     const response = await drive.files.get({ fileId, alt: "media", supportsAllDrives: true }, { responseType: "stream" })
     return { body: response.data as Readable, name: metadata.data.name ?? "download", mimeType: metadata.data.mimeType ?? "application/octet-stream", sizeBytes: Number(metadata.data.size ?? 0) }
   }
 
   async function remove(fileId: string) {
-    const { drive } = await driveForRequest()
+    const { drive, connection } = await driveForRequest()
     try {
+      await assertWorkspaceObject(drive, connection, fileId)
       await drive.files.delete({ fileId, supportsAllDrives: true })
     } catch (error) {
       const status = (error as { response?: { status?: number }; code?: number }).response?.status ?? (error as { code?: number }).code
@@ -136,20 +158,25 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
   }
 
   async function rename(fileId: string, name: string) {
-    const { drive } = await driveForRequest()
+    const { drive, connection } = await driveForRequest()
+    await assertWorkspaceObject(drive, connection, fileId)
     const response = await drive.files.update({ fileId, requestBody: { name }, fields: "id,name,mimeType,size,webViewLink", supportsAllDrives: true })
     return objectFromFile(response.data)
   }
 
   async function move(fileId: string, parentId: string) {
-    const { drive } = await driveForRequest()
+    const { drive, connection } = await driveForRequest()
+    await assertWorkspaceObject(drive, connection, fileId)
+    await assertWorkspaceObject(drive, connection, parentId, true)
     const current = await drive.files.get({ fileId, fields: "parents", supportsAllDrives: true })
     const response = await drive.files.update({ fileId, addParents: parentId, removeParents: (current.data.parents ?? []).join(","), fields: "id,name,mimeType,size,webViewLink", supportsAllDrives: true })
     return objectFromFile(response.data)
   }
 
   async function copy(fileId: string, parentId: string, name?: string) {
-    const { drive } = await driveForRequest()
+    const { drive, connection } = await driveForRequest()
+    await assertWorkspaceObject(drive, connection, fileId)
+    await assertWorkspaceObject(drive, connection, parentId, true)
     const response = await drive.files.copy({ fileId, requestBody: { ...(name ? { name } : {}), parents: [parentId] }, fields: "id,name,mimeType,size,webViewLink", supportsAllDrives: true })
     return objectFromFile(response.data)
   }
@@ -165,7 +192,22 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     return (response.data.files ?? []).map(objectFromFile)
   }
 
-  return { ensureFolder, getUsage, upload, makePublic, download, delete: remove, rename, move, copy, createFolder, list, get }
+  return { ensureFolder, getUsage, upload, download, delete: remove, rename, move, copy, createFolder, list, get }
+}
+
+async function assertDescendant(drive: Drive, fileId: string, folderId: string) {
+  const visited = new Set<string>()
+  let currentId = fileId
+  for (let depth = 0; depth < 100; depth++) {
+    if (visited.has(currentId)) break
+    visited.add(currentId)
+    const { data } = await drive.files.get({ fileId: currentId, fields: "parents,trashed,mimeType", supportsAllDrives: true })
+    if (data.trashed || data.mimeType === "application/vnd.google-apps.shortcut") break
+    if (data.parents?.includes(folderId)) return
+    if (data.parents?.length !== 1) break
+    currentId = data.parents[0]
+  }
+  throw new Error("File is outside workspace storage")
 }
 
 export const legacyGoogleDriveStorage = googleDriveStorage()

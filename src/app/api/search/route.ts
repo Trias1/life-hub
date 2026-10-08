@@ -28,10 +28,10 @@ export async function GET(request: Request) {
   }
 
   const results: SearchResult[] = [
-    ...(notes.data ?? []).map((note) => ({ id: note.id, type: "note" as const, title: note.title, subtitle: note.content.trim().slice(0, 100) || "Note", href: `/notes?note=${note.id}`, updatedAt: note.updated_at })),
-    ...(tasks.data ?? []).map((task) => ({ id: task.id, type: "task" as const, title: task.title, subtitle: `${task.status.replaceAll("_", " ")} - ${task.priority} priority`, href: `/tasks#task-${task.id}`, updatedAt: task.updated_at })),
+    ...(notes.data ?? []).map((note) => ({ id: note.id, type: "note" as const, title: note.title, subtitle: "Note", href: `/notes/${note.id}`, updatedAt: note.updated_at })),
+    ...(tasks.data ?? []).map((task) => ({ id: task.id, type: "task" as const, title: task.title, subtitle: `${task.status.replaceAll("_", " ")} - ${task.priority} priority`, href: `/tasks/${task.id}`, updatedAt: task.updated_at })),
     ...(files.data ?? []).map((file) => ({ id: file.id, type: "file" as const, title: file.name, subtitle: `${file.folder} - ${file.mime_type}`, href: `/files?q=${encodeURIComponent(file.name)}`, updatedAt: file.updated_at })),
-    ...(bookmarks.data ?? []).map((bookmark) => ({ id: bookmark.id, type: "bookmark" as const, title: bookmark.title, subtitle: `${bookmark.collection} - ${bookmark.url}`, href: `/bookmarks?q=${encodeURIComponent(bookmark.title)}`, updatedAt: bookmark.updated_at })),
+    ...(bookmarks.data ?? []).map((bookmark) => ({ id: bookmark.id, type: "bookmark" as const, title: bookmark.title, subtitle: `${bookmark.collection} - ${bookmark.url}`, href: `/bookmarks/${bookmark.id}`, updatedAt: bookmark.updated_at })),
   ].sort((first, second) => Date.parse(second.updatedAt) - Date.parse(first.updatedAt)).slice(0, 10)
 
   return Response.json({ results })

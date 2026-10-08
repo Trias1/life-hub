@@ -1,6 +1,6 @@
 import { Readable } from "node:stream"
 import { NextResponse } from "next/server"
-import { getStorageForWorkspace } from "@/lib/storage/storage"
+import { getStorageForWorkspace, storageResponseHeaders } from "@/lib/storage/storage"
 import { getWorkspaceContext } from "@/lib/workspace/server"
 
 export const runtime = "nodejs"
@@ -14,8 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const fileId = version.storage_path.replace(/^google-drive:/, "")
   try {
     const download = await getStorageForWorkspace(context.workspaceId).download(fileId)
-    const disposition = new URL(request.url).searchParams.get("inline") === "1" ? "inline" : "attachment"
-    return new NextResponse(Readable.toWeb(download.body) as ReadableStream, { headers: { "Content-Type": download.mimeType || version.mime_type, "Content-Length": String(download.sizeBytes || version.size_bytes), "Content-Disposition": disposition + "; filename*=UTF-8''" + encodeURIComponent(download.name || version.name), "Cache-Control": "private, no-store" } })
+    return new NextResponse(Readable.toWeb(download.body) as ReadableStream, { headers: storageResponseHeaders(download, new URL(request.url).searchParams.get("inline") === "1") })
   } catch (downloadError) {
     console.error("download file version")
     return NextResponse.json({ error: "Could not download file version" }, { status: 502 })

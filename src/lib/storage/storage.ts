@@ -32,7 +32,6 @@ export interface StorageService {
   ensureFolder(path: string[]): Promise<string>
   getUsage(): Promise<StorageUsage>
   upload(input: StorageUploadInput): Promise<StoredObject>
-  makePublic(fileId: string): Promise<void>
   download(fileId: string): Promise<StorageDownload>
   delete(fileId: string): Promise<void>
   rename(fileId: string, name: string): Promise<StoredObject>
@@ -45,8 +44,21 @@ export interface StorageService {
 
 import { googleDriveStorage } from "./google-drive"
 
+export { DriveNotConnectedError } from "./google-drive"
+
 export function getStorageForWorkspace(workspaceId: string): StorageService {
   return googleDriveStorage(workspaceId)
 }
 
 export const storage: StorageService = googleDriveStorage()
+
+export function storageResponseHeaders(download: Pick<StorageDownload, "name" | "mimeType">, inline = false) {
+  const raster = /^image\/(jpeg|png|gif|webp)$/.test(download.mimeType)
+  return {
+    "Content-Type": raster ? download.mimeType : "application/octet-stream",
+    "Content-Disposition": (inline && raster ? "inline" : "attachment") + "; filename*=UTF-8''" + encodeURIComponent(download.name).replace(/['()*]/g, (character) => "%" + character.charCodeAt(0).toString(16)),
+    "Content-Security-Policy": "sandbox; default-src 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "private, no-store",
+  }
+}

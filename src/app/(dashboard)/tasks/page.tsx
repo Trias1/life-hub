@@ -1,415 +1,228 @@
-import Link from "next/link";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Select } from "@/components/ui/select";
-import { getWorkspaceContext } from "@/lib/workspace/server";
-import { TaskBoard } from "@/components/task-board";
-import {
-  assignTask,
-  attachTaskFile,
-  createChecklistItem,
-  createTask,
-  createTaskComment,
-  createTaskLabel,
-  deleteTaskPermanently,
-  detachTaskFile,
-  restoreTask,
-  toggleChecklistItem,
-  toggleTaskLabel,
-  trashTask,
-  updateTask,
-  updateTaskStatus,
-} from "./actions";
+import Link from "next/link"
+import { redirect } from "next/navigation"
+import { CircleCheck, CircleDot, CircleSlash, Columns3, List, MessageSquare, Paperclip, RotateCcw, Search, Trash2 } from "lucide-react"
+import { TaskBoard, type BoardTask } from "@/components/task-board"
+import { AssigneeBadge, LabelChip, PriorityChip } from "@/components/tasks/task-chip"
+import { TaskHashRedirect } from "@/components/tasks/task-hash-redirect"
+import { addDays, closedStatuses, isOpenStatus, memberName, openStatuses, priorityOptions, statusLabel, taskStatuses, todayKey, type TaskLabel, type TaskStatus } from "@/components/tasks/task-meta"
+import { Select } from "@/components/ui/select"
+import { formatDayMonth } from "@/lib/format-date"
+import { relativeTime } from "@/lib/relative-time"
+import { getWorkspaceContext } from "@/lib/workspace/server"
+import { restoreTask, updateTaskStatus } from "./actions"
 
-type TaskView = "active" | "trash";
+type State = "open" | "closed" | "all" | "trash"
+type Sort = "created" | "updated" | "due" | "priority" | "title"
+type Due = "" | "overdue" | "next_7_days" | "no_date"
+const PER_PAGE = 20
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
 
-export default async function TasksPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; success?: string; view?: TaskView }>;
-}) {
-  const { error, success, view = "active" } = await searchParams;
-  const currentView: TaskView = view === "trash" ? "trash" : "active";
-  const context = await getWorkspaceContext();
-  if (!context) return null;
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string; view?: string; task?: string; layout?: string; q?: string; status?: string; priority?: string; assignee?: string; due?: string; label?: string; sort?: string; page?: string }> }) {
+  const params = await searchParams
+  // Old links pointed at /tasks?task=<id>.
+  if (params.task && uuid.test(params.task)) redirect("/tasks/" + params.task)
 
-  let tasksQuery = context.supabase
-    .from("tasks")
-    .select(
-      "id,title,description,status,priority,due_date,assignee_id,created_by,deleted_at",
-    )
-    .eq("workspace_id", context.workspaceId);
-  tasksQuery =
-    currentView === "trash"
-      ? tasksQuery.not("deleted_at", "is", null)
-      : tasksQuery.is("deleted_at", null);
-  const { data: tasks, error: tasksError } = await tasksQuery.order(
-    "created_at",
-    { ascending: false },
-  );
-  const taskRows = tasks ?? [];
+  const layout = params.layout === "board" ? "board" : "list"
+  // The board shows every status as a column, so it always works on all active tasks.
+  const state: State = layout === "board" ? "all" : params.view === "closed" || params.view === "all" || params.view === "trash" ? params.view : "open"
+  const sort: Sort = params.sort === "updated" || params.sort === "due" || params.sort === "priority" || params.sort === "title" ? params.sort : "created"
+  const q = (params.q ?? "").trim().slice(0, 100)
+  const status = taskStatuses.some(([key]) => key === params.status) ? params.status as TaskStatus : ""
+  const priority = priorityOptions.some((option) => option.value === params.priority) ? params.priority as string : ""
+  const assignee = params.assignee === "me" || params.assignee === "unassigned" || (params.assignee && uuid.test(params.assignee)) ? params.assignee : ""
+  const due: Due = params.due === "overdue" || params.due === "next_7_days" || params.due === "no_date" ? params.due : ""
+  const label = params.label && uuid.test(params.label) ? params.label : ""
+  const context = await getWorkspaceContext()
+  if (!context) return null
+  const supabase = context.supabase
+  const now = new Date()
+  const today = todayKey(now)
 
-  const header = (
-    <>
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Plan and execute</p>
-          <h1 className="page-title">Tasks</h1>
-          <p className="page-description">
-            Keep ownership, priority, and the next action visible without adding
-            noise.
-          </p>
-        </div>
-        <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600">
-          {taskRows.length} {currentView === "trash" ? "trashed" : "active"}
-        </span>
-      </header>
-      <nav aria-label="Task views" className="mt-6 flex gap-2">
-        <Link
-          href="/tasks"
-          className={
-            currentView === "active" ? "button-secondary" : "button-quiet"
-          }
-        >
-          Active
-        </Link>
-        <Link
-          href="/tasks?view=trash"
-          className={
-            currentView === "trash" ? "button-secondary" : "button-quiet"
-          }
-        >
-          Trash
-        </Link>
-      </nav>
-      {(error || tasksError) && (
-        <p
-          role="alert"
-          className="mt-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-        >
-          {error ?? "Could not load tasks. Please try again."}
-        </p>
-      )}
-      {success && (
-        <p
-          role="status"
-          className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
-        >
-          {success}
-        </p>
-      )}
-    </>
-  );
+  const counted = (scope: State) => {
+    let query = supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", context.workspaceId)
+    if (scope === "trash") return query.not("deleted_at", "is", null)
+    query = query.is("deleted_at", null)
+    if (scope === "open") query = query.in("status", openStatuses)
+    if (scope === "closed") query = query.in("status", closedStatuses)
+    return query
+  }
 
-  if (currentView === "trash")
-    return (
-      <div className="page-container">
-        {header}
-        <section className="mt-8 space-y-3">
-          {taskRows.length ? (
-            taskRows.map((task) => (
-              <article key={task.id} className="surface p-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <h2 className="font-semibold">{task.title}</h2>
-                    {task.description && (
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-500">
-                        {task.description}
-                      </p>
-                    )}
-                    <p className="mt-2 text-xs text-zinc-400">
-                      {task.priority} priority
-                      {task.due_date
-                        ? " ? Due " +
-                          new Date(
-                            task.due_date + "T00:00:00",
-                          ).toLocaleDateString()
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-start gap-2">
-                    <form action={restoreTask}>
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <button
-                        className="button-secondary"
-                        aria-label={`Restore ${task.title}`}
-                      >
-                        Restore
-                      </button>
-                    </form>
-                    {task.created_by === context.user.id && (
-                      <details className="rounded-xl border border-red-200 px-3 py-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-red-600">
-                          Delete permanently
-                        </summary>
-                        <p className="mt-2 max-w-56 text-xs text-zinc-500">
-                          This removes the task and its details forever.
-                        </p>
-                        <form action={deleteTaskPermanently} className="mt-2">
-                          <input type="hidden" name="taskId" value={task.id} />
-                          <button
-                            className="button-quiet min-h-0 px-2 py-1 text-xs text-red-600"
-                            aria-label={`Permanently delete ${task.title}`}
-                          >
-                            Confirm delete
-                          </button>
-                        </form>
-                      </details>
-                    )}
-                  </div>
-                </div>
-              </article>
-            ))
-          ) : (
-            <div className="empty-state surface">
-              <h2 className="font-semibold">Trash is empty</h2>
-              <p>
-                Deleted tasks will appear here until restored or permanently
-                removed.
-              </p>
-            </div>
-          )}
-        </section>
-      </div>
-    );
+  const [openCount, closedCount, allCount, trashCount, { data: labels }, { data: members }, labelTasks] = await Promise.all([
+    counted("open"),
+    counted("closed"),
+    counted("all"),
+    counted("trash"),
+    supabase.from("task_labels").select("id,name,color").eq("workspace_id", context.workspaceId).order("name"),
+    supabase.from("workspace_members").select("user_id").eq("workspace_id", context.workspaceId).order("created_at"),
+    label ? supabase.from("task_label_assignments").select("task_id").eq("label_id", label) : Promise.resolve({ data: null }),
+  ])
+  const counts: Record<State, number> = { open: openCount.count ?? 0, closed: closedCount.count ?? 0, all: allCount.count ?? 0, trash: trashCount.count ?? 0 }
+  const labelTaskIds = (labelTasks.data ?? []).map((row) => row.task_id)
 
-  const taskIds = taskRows.map((task) => task.id);
-  const { data: members } = await context.supabase
-    .from("workspace_members")
-    .select("user_id,role")
-    .eq("workspace_id", context.workspaceId)
-    .order("created_at");
-  const { data: labels } = await context.supabase
-    .from("task_labels")
-    .select("id,name,color")
-    .eq("workspace_id", context.workspaceId)
-    .order("name");
-  const { data: assignments } = taskIds.length
-    ? await context.supabase
-        .from("task_label_assignments")
-        .select("task_id,label_id")
-        .in("task_id", taskIds)
-    : { data: [] as Array<{ task_id: string; label_id: string }> };
-  const { data: checklist } = taskIds.length
-    ? await context.supabase
-        .from("task_checklist_items")
-        .select("id,task_id,title,is_completed")
-        .in("task_id", taskIds)
-        .order("position")
-    : {
-        data: [] as Array<{
-          id: string;
-          task_id: string;
-          title: string;
-          is_completed: boolean;
-        }>,
-      };
-  const { data: comments } = taskIds.length
-    ? await context.supabase
-        .from("task_comments")
-        .select("id,task_id,author_id,body,created_at")
-        .in("task_id", taskIds)
-        .order("created_at", { ascending: true })
-    : {
-        data: [] as Array<{
-          id: string;
-          task_id: string;
-          author_id: string;
-          body: string;
-          created_at: string;
-        }>,
-      };
-  const { data: attachmentRows } = taskIds.length
-    ? await context.supabase
-        .from("task_attachments")
-        .select("id,task_id,file_id")
-        .in("task_id", taskIds)
-    : { data: [] as Array<{ id: string; task_id: string; file_id: string }> };
-  const attachmentFileIds = Array.from(
-    new Set((attachmentRows ?? []).map((attachment) => attachment.file_id)),
-  );
-  const { data: attachmentFiles } = attachmentFileIds.length
-    ? await context.supabase
-        .from("files")
-        .select("id,name,mime_type,size_bytes")
-        .in("id", attachmentFileIds)
-    : {
-        data: [] as Array<{
-          id: string;
-          name: string;
-          mime_type: string;
-          size_bytes: number;
-        }>,
-      };
-  const filesById = new Map(
-    (attachmentFiles ?? []).map((file) => [file.id, file]),
-  );
-  const taskAttachments = (attachmentRows ?? []).flatMap((attachment) => {
-    const file = filesById.get(attachment.file_id);
-    return file ? [{ ...attachment, file }] : [];
-  });
-  const { data: timeline } = taskIds.length
-    ? await context.supabase
-        .from("activity_logs")
-        .select("id,action,entity_id,created_at")
-        .eq("workspace_id", context.workspaceId)
-        .eq("entity_type", "task")
-        .in("entity_id", taskIds)
-        .order("created_at", { ascending: false })
-    : {
-        data: [] as Array<{
-          id: string;
-          action: string;
-          entity_id: string;
-          created_at: string;
-        }>,
-      };
-  const { data: availableFiles } = await context.supabase
-    .from("files")
-    .select("id,name,mime_type,size_bytes")
-    .eq("workspace_id", context.workspaceId)
-    .is("trashed_at", null)
-    .order("name");
-  const openTasks = taskRows.filter(
-    (task) => task.status !== "done" && task.status !== "cancelled",
-  ).length;
-  const dueTasks = taskRows.filter(
-    (task) =>
-      task.due_date && task.status !== "done" && task.status !== "cancelled",
-  ).length;
+  let tasksQuery = supabase.from("tasks").select("id,title,status,priority,due_date,assignee_id,created_by,created_at,updated_at,deleted_at").eq("workspace_id", context.workspaceId)
+  if (state === "trash") tasksQuery = tasksQuery.not("deleted_at", "is", null)
+  else tasksQuery = tasksQuery.is("deleted_at", null)
+  if (state === "open") tasksQuery = tasksQuery.in("status", openStatuses)
+  if (state === "closed") tasksQuery = tasksQuery.in("status", closedStatuses)
+  if (q) tasksQuery = tasksQuery.ilike("title", "%" + q.replace(/[%_\\]/g, (character) => "\\" + character) + "%")
+  if (status) tasksQuery = tasksQuery.eq("status", status)
+  if (priority) tasksQuery = tasksQuery.eq("priority", priority)
+  if (assignee === "unassigned") tasksQuery = tasksQuery.is("assignee_id", null)
+  else if (assignee) tasksQuery = tasksQuery.eq("assignee_id", assignee === "me" ? context.user.id : assignee)
+  if (due === "overdue") tasksQuery = tasksQuery.lt("due_date", today).in("status", openStatuses)
+  if (due === "next_7_days") tasksQuery = tasksQuery.gte("due_date", today).lte("due_date", addDays(today, 7)).in("status", openStatuses)
+  if (due === "no_date") tasksQuery = tasksQuery.is("due_date", null)
+  if (label) tasksQuery = tasksQuery.in("id", labelTaskIds.length ? labelTaskIds : ["00000000-0000-0000-0000-000000000000"])
+  if (sort === "title") tasksQuery = tasksQuery.order("title", { ascending: true })
+  else if (sort === "due") tasksQuery = tasksQuery.order("due_date", { ascending: true, nullsFirst: false })
+  else tasksQuery = tasksQuery.order(sort === "updated" ? "updated_at" : "created_at", { ascending: false })
+
+  const { data: tasks, error: tasksError } = await tasksQuery.limit(500)
+  const ordered = sort === "priority" ? [...(tasks ?? [])].sort((a, b) => (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3)) : tasks ?? []
+  const totalPages = layout === "board" ? 1 : Math.max(1, Math.ceil(ordered.length / PER_PAGE))
+  const page = Math.min(totalPages, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1))
+  const shown = layout === "board" ? ordered : ordered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+  const shownIds = shown.map((task) => task.id)
+
+  const [{ data: assignments }, { data: comments }, { data: attachments }, { data: checklist }] = shownIds.length
+    ? await Promise.all([
+      supabase.from("task_label_assignments").select("task_id,label_id").in("task_id", shownIds),
+      supabase.from("task_comments").select("task_id").in("task_id", shownIds),
+      supabase.from("task_attachments").select("task_id").in("task_id", shownIds),
+      supabase.from("task_checklist_items").select("task_id,is_completed").in("task_id", shownIds),
+    ])
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }] as const
+  const labelsById = new Map((labels ?? []).map((item) => [item.id, item as TaskLabel]))
+  const taskLabels = (taskId: string) => (assignments ?? []).flatMap((row) => row.task_id === taskId && labelsById.has(row.label_id) ? [labelsById.get(row.label_id) as TaskLabel] : [])
+  const countFor = (rows: ReadonlyArray<{ task_id: string }> | null, taskId: string) => (rows ?? []).filter((row) => row.task_id === taskId).length
+  const dueText = (value: string | null) => value ? formatDayMonth(value + "T00:00:00+07:00") : null
+  const isOverdue = (task: { due_date: string | null; status: string }) => Boolean(task.due_date && task.due_date < today && isOpenStatus(task.status))
+  const filtered = Boolean(q || status || priority || assignee || due || label)
+  const activeLabel = label ? labelsById.get(label) : undefined
+
+  const href = (changes: Record<string, string | undefined>) => {
+    const next = new URLSearchParams()
+    const merged = { layout: layout === "board" ? "board" : undefined, view: layout === "list" && state !== "open" ? state : undefined, q: q || undefined, status: status || undefined, priority: priority || undefined, assignee: assignee || undefined, due: due || undefined, label: label || undefined, sort: sort === "created" ? undefined : sort, ...changes }
+    for (const [key, value] of Object.entries(merged)) if (value) next.set(key, value)
+    const query = next.toString()
+    return "/tasks" + (query ? "?" + query : "")
+  }
+  const memberOptions = (members ?? []).filter((member) => member.user_id !== context.user.id).map((member) => ({ value: member.user_id, label: memberName(member.user_id, context.user.id) }))
 
   return (
     <div className="page-container">
-      {header}
-      <div className="mt-6 flex flex-wrap gap-2">
-        <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
-          {openTasks} open
-        </span>
-        <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600">
-          {dueTasks} scheduled
-        </span>
+      <TaskHashRedirect />
+      {params.error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{params.error}</p>}
+      {(tasksError) && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">Could not load tasks. Please try again.</p>}
+      {params.success && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{params.success}</p>}
+
+      <div className="issue-page-head">
+        <h1 className="issue-title">Tasks</h1>
+        <div className="flex shrink-0 items-center gap-2">
+          <nav aria-label="Layout" className="flex rounded-[var(--radius-control)] border border-[var(--line)] p-0.5">
+            <Link href={href({ layout: undefined, page: undefined })} aria-current={layout === "list" ? "page" : undefined} title="List" className={"inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold " + (layout === "list" ? "bg-[var(--surface-muted)] text-[var(--foreground)]" : "text-[var(--muted)]")}><List size={14} aria-hidden /><span className="max-sm:sr-only">List</span></Link>
+            <Link href={href({ layout: "board", view: undefined, page: undefined })} aria-current={layout === "board" ? "page" : undefined} title="Board" className={"inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold " + (layout === "board" ? "bg-[var(--surface-muted)] text-[var(--foreground)]" : "text-[var(--muted)]")}><Columns3 size={14} aria-hidden /><span className="max-sm:sr-only">Board</span></Link>
+          </nav>
+          <Link href="/tasks/new" className="button-primary min-h-0 px-3.5 py-2">New task</Link>
+        </div>
       </div>
-      <section className="surface mt-8 p-5">
-        <div className="toolbar">
-          <div>
-            <p className="eyebrow">Quick add</p>
-            <h2 className="mt-1 text-lg font-semibold">Create a task</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Start with the outcome, then set the urgency and date.
-            </p>
-          </div>
+      <div className="issue-list-head">
+        <nav aria-label="Task views" className="issue-tabs">
+          {([["open", "Open"], ["closed", "Closed"], ["all", "All"], ["trash", "Trash"]] as const).map(([key, text]) => (
+            <Link key={key} href={href({ layout: undefined, view: key === "open" ? undefined : key, page: undefined })} aria-current={state === key ? "page" : undefined} className={"issue-tab" + (state === key ? " is-active" : "")}>
+              {text}<span className="issue-tab-count">{counts[key]}</span>
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      <form method="get" className="issue-filter">
+        {layout === "board" && <input type="hidden" name="layout" value="board" />}
+        {layout === "list" && state !== "open" && <input type="hidden" name="view" value={state} />}
+        {label && <input type="hidden" name="label" value={label} />}
+        <label className="issue-search">
+          <Search size={15} aria-hidden />
+          <span className="sr-only">Search tasks by title</span>
+          <input name="q" defaultValue={q} placeholder="Search by title…" />
+        </label>
+        <Select name="status" defaultValue={status} placeholder="Any status" className="field-control issue-filter-select" options={[{ value: "", label: "Any status" }, ...taskStatuses.map(([value, text]) => ({ value, label: text }))]} />
+        <Select name="sort" defaultValue={sort} className="field-control issue-filter-select" options={[{ value: "created", label: "Created date" }, { value: "updated", label: "Updated date" }, { value: "due", label: "Due date" }, { value: "priority", label: "Priority" }, { value: "title", label: "Title" }]} />
+        <button className="issue-filter-apply button-secondary min-h-0 px-3.5 py-2">Apply</button>
+        <div className="col-span-full grid grid-cols-2 gap-2 sm:grid-cols-[repeat(3,minmax(0,11rem))]">
+          <Select name="priority" defaultValue={priority} placeholder="Any priority" className="field-control issue-filter-select" options={[{ value: "", label: "Any priority" }, ...priorityOptions.map((option) => ({ value: option.value, label: option.label + " priority" }))]} />
+          <Select name="assignee" defaultValue={assignee} placeholder="Any assignee" className="field-control issue-filter-select" options={[{ value: "", label: "Any assignee" }, { value: "me", label: "Assigned to me" }, { value: "unassigned", label: "Unassigned" }, ...memberOptions]} />
+          <Select name="due" defaultValue={due} placeholder="Any due date" className="field-control issue-filter-select" options={[{ value: "", label: "Any due date" }, { value: "overdue", label: "Overdue" }, { value: "next_7_days", label: "Due in 7 days" }, { value: "no_date", label: "No due date" }]} />
         </div>
-        <form
-          action={createTask}
-          className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
-        >
-          <label className="sr-only" htmlFor="task-title">
-            Task title
-          </label>
-          <input
-            id="task-title"
-            required
-            name="title"
-            placeholder="What needs to happen?"
-            className="field-control"
-          />
-          <Select
-            name="priority"
-            defaultValue="medium"
-            options={[
-              { value: "low", label: "Low priority" },
-              { value: "medium", label: "Medium priority" },
-              { value: "high", label: "High priority" },
-            ]}
-          />
-          <label className="sr-only" htmlFor="task-due-date">
-            Due date
-          </label>
-          <DateTimePicker name="dueDate" dateOnly />
-          <Select
-            name="assigneeId"
-            defaultValue=""
-            options={[
-              { value: "", label: "Unassigned" },
-              ...(members ?? []).map((member) => ({
-                value: member.user_id,
-                label: "Member " + member.user_id.slice(0, 8),
-              })),
-            ]}
-          />
-          <button className="button-primary">Add task</button>
-        </form>
-      </section>
-      <section className="surface mt-4 mb-4 p-5">
-        <div className="toolbar">
-          <div>
-            <p className="eyebrow">Labels</p>
-            <h2 className="mt-1 text-base font-semibold">Manage task labels</h2>
-          </div>
+      </form>
+
+      {filtered && (
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+          Showing {ordered.length} {ordered.length === 1 ? "task" : "tasks"}
+          {activeLabel && <>with label <LabelChip name={activeLabel.name} color={activeLabel.color} /></>}
+          <Link href={href({ q: undefined, status: undefined, priority: undefined, assignee: undefined, due: undefined, label: undefined, page: undefined })} className="underline">Clear filters</Link>
+        </p>
+      )}
+
+      {layout === "board" ? (
+        <TaskBoard
+          action={updateTaskStatus}
+          tasks={shown.map((task): BoardTask => ({ id: task.id, title: task.title, status: task.status as TaskStatus, priority: task.priority, dueLabel: dueText(task.due_date), overdue: isOverdue(task), assigneeName: task.assignee_id ? memberName(task.assignee_id, context.user.id) : null, labels: taskLabels(task.id) }))}
+        />
+      ) : shown.length ? (
+        <ul className="issue-list">
+          {shown.map((task) => {
+            const Icon = state === "trash" ? Trash2 : task.status === "done" ? CircleCheck : task.status === "cancelled" ? CircleSlash : CircleDot
+            const items = (checklist ?? []).filter((row) => row.task_id === task.id)
+            const commentCount = countFor(comments, task.id)
+            const attachmentCount = countFor(attachments, task.id)
+            const overdue = isOverdue(task)
+            return (
+              <li key={task.id} className="issue-row">
+                <Icon size={16} className={"issue-row-icon" + (task.status === "done" && state !== "trash" ? " text-[var(--accent)]" : "")} aria-label={statusLabel(task.status)} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Link href={"/tasks/" + task.id} className="issue-row-title">{task.title}</Link>
+                    <PriorityChip priority={task.priority} />
+                    {taskLabels(task.id).map((item) => <Link key={item.id} href={href({ label: item.id, page: undefined })}><LabelChip name={item.name} color={item.color} /></Link>)}
+                  </div>
+                  <p className="issue-row-meta">
+                    {statusLabel(task.status)} · created {relativeTime(task.created_at, now)} by {task.created_by ? memberName(task.created_by, context.user.id) : "a former member"}
+                    {task.due_date && <> · <span className={overdue ? "font-semibold text-red-600" : ""}>{overdue ? "Overdue · " : "Due "}{dueText(task.due_date)}</span></>}
+                    {items.length > 0 && <> · {items.filter((item) => item.is_completed).length}/{items.length} checklist</>}
+                  </p>
+                </div>
+                <div className="issue-row-side">
+                  <div className="flex items-center gap-2.5">
+                    {state === "trash" ? (
+                      <form action={restoreTask}><input type="hidden" name="taskId" value={task.id} /><button className="button-secondary min-h-0 px-2.5 py-1 text-xs" aria-label={`Restore ${task.title}`}><RotateCcw size={12} className="mr-1" aria-hidden />Restore</button></form>
+                    ) : <>
+                      {commentCount > 0 && <div className="inline-flex items-center gap-1" title={commentCount + " comments"}><MessageSquare size={13} aria-hidden />{commentCount}</div>}
+                      {attachmentCount > 0 && <div className="inline-flex items-center gap-1" title={attachmentCount + " attachments"}><Paperclip size={13} aria-hidden />{attachmentCount}</div>}
+                      {task.assignee_id && <AssigneeBadge name={memberName(task.assignee_id, context.user.id)} />}
+                    </>}
+                  </div>
+                  <span>updated {relativeTime(task.updated_at, now)}</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <div className="issue-empty">
+          <h2>{filtered ? "No tasks match these filters" : state === "open" ? "No open tasks" : state === "closed" ? "No closed tasks" : state === "trash" ? "Trash is empty" : "No tasks yet"}</h2>
+          <p>{filtered ? "Try a different title, status, or filter." : state === "trash" ? "Deleted tasks stay here until restored or permanently removed." : "Write down the outcome you want, then set an owner, priority, and due date."}</p>
+          {!filtered && (state === "open" || state === "all") && <Link href="/tasks/new" className="button-primary mt-4">New task</Link>}
         </div>
-        <form
-          action={createTaskLabel}
-          className="mt-4 flex flex-wrap items-center gap-2"
-        >
-          <input
-            required
-            name="name"
-            placeholder="New label name"
-            className="field-control min-h-0 py-2 text-xs"
-            aria-label="Label name"
-          />
-          <Select
-            name="color"
-            defaultValue="indigo"
-            options={[
-              { value: "indigo", label: "Neutral" },
-              { value: "blue", label: "Blue" },
-              { value: "emerald", label: "Emerald" },
-              { value: "rose", label: "Rose" },
-              { value: "amber", label: "Amber" },
-            ]}
-          />
-          <button className="button-secondary min-h-0 px-3 py-2 text-xs">
-            Create label
-          </button>
-        </form>
-        {(labels ?? []).length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(labels ?? []).map((label) => (
-              <span
-                key={label.id}
-                className="rounded-full px-2 py-1 text-xs font-semibold bg-[var(--surface-muted)] text-[var(--foreground)]"
-              >
-                {label.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </section>
-      <TaskBoard
-        tasks={taskRows}
-        action={updateTaskStatus}
-        advanced={{
-          members: members ?? [],
-          labels: labels ?? [],
-          assignments: assignments ?? [],
-          checklist: checklist ?? [],
-          comments: comments ?? [],
-          files: availableFiles ?? [],
-          attachments: taskAttachments,
-          timeline: timeline ?? [],
-          actions: {
-            assignTask,
-            attachTaskFile,
-            createChecklistItem,
-            createTaskComment,
-            detachTaskFile,
-            toggleChecklistItem,
-            toggleTaskLabel,
-            trashTask,
-            updateTask,
-          },
-        }}
-      />
+      )}
+
+      {totalPages > 1 && (
+        <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-sm text-[var(--muted)]">
+          {page > 1 ? <Link href={href({ page: String(page - 1) })} className="button-secondary min-h-0 px-3 py-1.5">Previous</Link> : <span />}
+          <span>Page {page} of {totalPages}</span>
+          {page < totalPages ? <Link href={href({ page: String(page + 1) })} className="button-secondary min-h-0 px-3 py-1.5">Next</Link> : <span />}
+        </nav>
+      )}
     </div>
-  );
+  )
 }

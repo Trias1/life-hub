@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { expandCalendarEvents, type CalendarEventSource } from "@/lib/calendar/recurrence"
@@ -7,7 +8,10 @@ export const runtime = "nodejs"
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET
-  return Boolean(secret && request.headers.get("authorization") === "Bearer " + secret)
+  if (!secret) return false
+  const expected = Buffer.from("Bearer " + secret)
+  const received = Buffer.from(request.headers.get("authorization") ?? "")
+  return received.length === expected.length && timingSafeEqual(received, expected)
 }
 
 export async function GET(request: Request) {
@@ -38,7 +42,7 @@ export async function GET(request: Request) {
   for (const event of dueEvents) {
     const recipients = Array.from(new Set((recipientsByEvent.get(event.source_id) ?? []).filter((recipientId) => recipientId && notificationEnabled(preferencesByUser.get(recipientId) ?? null, "calendar"))))
     const message = "Reminder: " + event.title + " starts " + new Date(event.starts_at).toLocaleString() + "."
-    const { error: notificationError } = recipients.length ? await supabase.from("notifications").insert(recipients.map((recipientId) => ({ workspace_id: event.workspace_id, recipient_id: recipientId, actor_id: event.creator_id, type: "calendar", message, priority: "high", resource_type: "calendar event", resource_id: event.source_id, resource_name: event.title, link: "/calendar" }))) : { error: null }
+    const { error: notificationError } = recipients.length ? await supabase.from("notifications").insert(recipients.map((recipientId) => ({ workspace_id: event.workspace_id, recipient_id: recipientId, actor_id: event.creator_id, type: "calendar", message, priority: "high", resource_type: "calendar event", resource_id: event.source_id, resource_name: event.title, link: "/calendar/" + event.source_id }))) : { error: null }
     if (notificationError) continue
     const { error: updateError } = await supabase.from("calendar_events").update({ reminder_sent_for: event.starts_at }).eq("id", event.source_id)
     if (!updateError) sent += 1

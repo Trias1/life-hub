@@ -44,6 +44,7 @@ type SidebarLayoutProps = {
     activity: number;
     storageBytes: number;
     storageLimitBytes: number | null;
+    driveConnected: boolean;
   };
   spaces: Array<{ id: string; name: string; color: string }>;
   notifications: NotificationItem[];
@@ -78,15 +79,18 @@ export function SidebarLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const applyPreferences = () => {
+    const syncCollapsed = () => {
       const preferences = readCustomizePreferences();
-      applyCustomizePreferences(preferences);
       setCollapsed(
         preferences.sidebarMode === "icon" ||
           window.localStorage.getItem("lifehub:sidebar-collapsed") === "true",
       );
     };
-    applyPreferences();
+    // Apply once on mount; later changes are applied by whoever changed them and then
+    // announced via "lifehub:customize-change". Re-applying in that listener would
+    // dispatch the same event again and recurse forever.
+    applyCustomizePreferences(readCustomizePreferences());
+    syncCollapsed();
     let goChord = false;
     let chordTimer: number | undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -134,10 +138,10 @@ export function SidebarLayout({
         goChord = false;
       }
     };
-    window.addEventListener("lifehub:customize-change", applyPreferences);
+    window.addEventListener("lifehub:customize-change", syncCollapsed);
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      window.removeEventListener("lifehub:customize-change", applyPreferences);
+      window.removeEventListener("lifehub:customize-change", syncCollapsed);
       window.removeEventListener("keydown", onKeyDown);
       if (chordTimer) window.clearTimeout(chordTimer);
     };

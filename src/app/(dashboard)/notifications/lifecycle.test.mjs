@@ -8,7 +8,7 @@ const layout = readFileSync(new URL("../layout.tsx", import.meta.url), "utf8")
 
 test("notification views are isolated to the active workspace", () => {
   assert.match(page, /eq\("workspace_id", context\.workspaceId\)/)
-  assert.match(layout, /notifications"\).*eq\("workspace_id", context\.workspaceId\)/)
+  assert.match(layout, /from\("notifications"\)\s*\.select\([^)]*\)\s*\.eq\("workspace_id", context\.workspaceId\)/)
 })
 
 test("notification mutations require recipient and workspace", () => {

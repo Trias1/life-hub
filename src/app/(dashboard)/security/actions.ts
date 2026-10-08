@@ -15,10 +15,15 @@ export async function updatePassword(formData: FormData): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) fail("Your session expired. Sign in again before changing your password.")
+  // Checking the current password is a sign-in, so throttle it per user (bucket from migration 0030).
+  const { data: limit } = await supabase.rpc("consume_request_rate_limit", { p_bucket: "password" })
+  if (limit && limit.allowed === false) fail("Too many attempts. Wait a minute and try again.")
   const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password: input.data.currentPassword })
   if (verifyError) fail("Your current password is incorrect.")
   const { error } = await supabase.auth.updateUser({ password: input.data.newPassword })
   if (error) fail("Could not update your password. Please try again.")
+  // End every other session, so a stolen cookie stops working after a password change.
+  await supabase.auth.signOut({ scope: "others" })
   revalidatePath("/security")
   redirect("/security?success=Password%20updated")
 }

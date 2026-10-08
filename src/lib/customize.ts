@@ -67,7 +67,9 @@ export function applyCustomizePreferences(preferences: CustomizePreferences) {
   const root = document.documentElement
   const resolvedTheme = preferences.theme === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : preferences.theme
   const accentName = accentForTheme(resolvedTheme) === preferences.accent ? preferences.accent : preferences.accent
-  const accent = accents[accentName]
+  // Graphite is near-black, which disappears on the dark theme's black surfaces; invert it there.
+  const accent = accentName === "indigo" && resolvedTheme === "dark" ? { color: "#f4f4f5", hover: "#d4d4d8" } : accents[accentName]
+  const onAccent = accentName === "indigo" && resolvedTheme === "dark" ? "#0a0a0a" : "#ffffff"
   window.localStorage.setItem(`sanctumcove:accent-${resolvedTheme}`, accentName)
   const fontFamilies: Record<FontFamily, string> = { geist: "var(--font-geist-sans)", inter: "var(--font-inter)", manrope: "var(--font-manrope)" }
   root.dataset.theme = resolvedTheme
@@ -80,6 +82,7 @@ export function applyCustomizePreferences(preferences: CustomizePreferences) {
   Object.entries(preferences.widgets).forEach(([widget, visible]) => root.dataset["widget" + widget[0].toUpperCase() + widget.slice(1)] = String(visible))
   root.style.setProperty("--accent", accent.color)
   root.style.setProperty("--accent-hover", accent.hover)
+  root.style.setProperty("--on-accent", onAccent)
   root.style.setProperty("--radius-card", preferences.radius + "px")
   root.style.setProperty("--radius-control", Math.max(8, preferences.radius - 4) + "px")
   root.style.setProperty("--font-lifehub", fontFamilies[preferences.fontFamily])

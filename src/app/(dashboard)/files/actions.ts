@@ -19,9 +19,9 @@ function storageError(error: unknown) {
 export async function uploadFile(formData: FormData): Promise<void> {
   const value = formData.get("file")
   const folder = folderSchema.safeParse(formData.get("folder") ?? "General")
-  if (!(value instanceof File) || value.size === 0 || value.size > MAX_SIZE || !ALLOWED_TYPES.has(value.type) || !folder.success) actionFailure("/files", "upload file")
+  if (!(value instanceof File) || value.size === 0 || value.size > MAX_SIZE || !ALLOWED_TYPES.has(value.type) || !folder.success) actionFailure("/files/upload", "upload file")
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files", "access the active workspace")
+  if (!context) actionFailure("/files/upload", "access the active workspace")
   const storage = getStorageForWorkspace(context.workspaceId)
 
   const safeName = value.name.replace(/[^a-zA-Z0-9._-]/g, "-")
@@ -30,7 +30,7 @@ export async function uploadFile(formData: FormData): Promise<void> {
     const parentId = await storage.ensureFolder(["workspaces", context.workspaceId, "files"])
     uploaded = await storage.upload({ name: safeName, mimeType: value.type, body: Buffer.from(await value.arrayBuffer()), sizeBytes: value.size, parentId })
   } catch (error) {
-    actionFailure("/files", "upload file", storageError(error))
+    actionFailure("/files/upload", "upload file", storageError(error))
   }
 
   const { data: file, error } = await context.supabase.from("files").insert({ workspace_id: context.workspaceId, uploader_id: context.user.id, storage_path: "google-drive:" + uploaded.id, google_file_id: uploaded.id, storage_provider: "google-drive", name: value.name, mime_type: value.type, size_bytes: value.size, folder: folder.data }).select("id").single()
@@ -40,94 +40,102 @@ export async function uploadFile(formData: FormData): Promise<void> {
     } catch (rollbackError) {
       console.error("Could not remove orphaned Google Drive upload")
     }
-    actionFailure("/files", "save file metadata", error)
+    actionFailure("/files/upload", "save file metadata", error)
   }
 
   await recordActivity(context, { action: "Uploaded", entityType: "file", entityId: file.id })
   revalidatePath("/files")
   revalidatePath("/activity")
-  redirect("/files?success=File%20uploaded")
+  redirect("/files/" + file.id + "?success=File%20uploaded")
 }
 
 export async function toggleFileFavorite(formData: FormData): Promise<void> {
   const input = z.object({ id: z.string().uuid(), favorite: z.enum(["true", "false"]) }).safeParse({ id: formData.get("id"), favorite: formData.get("favorite") })
   if (!input.success) actionFailure("/files", "update file")
+  const back = "/files/" + input.data.id
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files", "access the active workspace")
+  if (!context) actionFailure(back, "access the active workspace")
 
   const { error } = await context.supabase.from("files").update({ is_favorite: input.data.favorite === "true" }).eq("id", input.data.id).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id)
-  if (error) actionFailure("/files", "update file", error)
+  if (error) actionFailure(back, "update file", error)
   await recordActivity(context, { action: input.data.favorite === "true" ? "Favorited" : "Unfavorited", entityType: "file", entityId: input.data.id })
   revalidatePath("/files")
+  revalidatePath(back)
   revalidatePath("/activity")
 }
 
 export async function trashFile(formData: FormData): Promise<void> {
   const id = z.string().uuid().safeParse(formData.get("id"))
   if (!id.success) actionFailure("/files", "trash file")
+  const back = "/files/" + id.data
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files", "access the active workspace")
+  if (!context) actionFailure(back, "access the active workspace")
 
   const { error } = await context.supabase.from("files").update({ trashed_at: new Date().toISOString() }).eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id)
-  if (error) actionFailure("/files", "trash file", error)
+  if (error) actionFailure(back, "trash file", error)
   await recordActivity(context, { action: "Trashed", entityType: "file", entityId: id.data })
   revalidatePath("/files")
+  revalidatePath(back)
   revalidatePath("/activity")
 }
 
 
 export async function restoreFile(formData: FormData): Promise<void> {
   const id = z.string().uuid().safeParse(formData.get("id"))
-  if (!id.success) actionFailure("/files?trash=true", "restore file")
+  if (!id.success) actionFailure("/files?view=trash", "restore file")
+  const back = "/files/" + id.data
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files?trash=true", "access the active workspace")
+  if (!context) actionFailure(back, "access the active workspace")
 
   const { error } = await context.supabase.from("files").update({ trashed_at: null }).eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id)
-  if (error) actionFailure("/files?trash=true", "restore file", error)
+  if (error) actionFailure(back, "restore file", error)
   await recordActivity(context, { action: "Restored", entityType: "file", entityId: id.data })
   revalidatePath("/files")
+  revalidatePath(back)
   revalidatePath("/activity")
 }
 
 export async function permanentlyDeleteFile(formData: FormData): Promise<void> {
   const id = z.string().uuid().safeParse(formData.get("id"))
-  if (!id.success) actionFailure("/files?trash=true", "delete file permanently")
+  if (!id.success) actionFailure("/files?view=trash", "delete file permanently")
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files?trash=true", "access the active workspace")
+  if (!context) actionFailure("/files?view=trash", "access the active workspace")
 
   const { data: file, error: readError } = await context.supabase.from("files").select("id,google_file_id").eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).not("trashed_at", "is", null).maybeSingle()
-  if (readError || !file) actionFailure("/files?trash=true", "find file", readError ?? new Error("File not found"))
+  if (readError || !file) actionFailure("/files?view=trash", "find file", readError ?? new Error("File not found"))
 
   if (file.google_file_id) {
     try {
       await getStorageForWorkspace(context.workspaceId).delete(file.google_file_id)
     } catch (error) {
-      actionFailure("/files?trash=true", "delete file from Google Drive", storageError(error))
+      actionFailure("/files?view=trash", "delete file from Google Drive", storageError(error))
     }
   }
   const { error: deleteError } = await context.supabase.from("files").delete().eq("id", id.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).not("trashed_at", "is", null)
-  if (deleteError) actionFailure("/files?trash=true", "delete file metadata", deleteError)
+  if (deleteError) actionFailure("/files?view=trash", "delete file metadata", deleteError)
   await recordActivity(context, { action: "Deleted permanently", entityType: "file", entityId: id.data })
   revalidatePath("/files")
   revalidatePath("/activity")
+  redirect("/files?view=trash&success=File%20deleted%20permanently")
 }
 
 export async function uploadFileVersion(formData: FormData): Promise<void> {
   const fileId = z.string().uuid().safeParse(formData.get("fileId"))
   const value = formData.get("version")
-  if (!fileId.success || !(value instanceof File) || value.size === 0 || value.size > MAX_SIZE || !ALLOWED_TYPES.has(value.type)) actionFailure("/files", "upload file version")
+  const back = fileId.success ? "/files/" + fileId.data : "/files"
+  if (!fileId.success || !(value instanceof File) || value.size === 0 || value.size > MAX_SIZE || !ALLOWED_TYPES.has(value.type)) actionFailure(back, "upload file version")
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files", "access the active workspace")
+  if (!context) actionFailure(back, "access the active workspace")
 
   const { data: file, error: fileError } = await context.supabase.from("files").select("id").eq("id", fileId.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).maybeSingle()
-  if (fileError || !file) actionFailure("/files", "find file", fileError ?? new Error("File not found"))
+  if (fileError || !file) actionFailure(back, "find file", fileError ?? new Error("File not found"))
   const storage = getStorageForWorkspace(context.workspaceId)
   let uploaded: Awaited<ReturnType<typeof storage.upload>>
   try {
     const parentId = await storage.ensureFolder(["workspaces", context.workspaceId, "files", "versions", file.id])
     uploaded = await storage.upload({ name: value.name.replace(/[^a-zA-Z0-9._-]/g, "-"), mimeType: value.type, body: Buffer.from(await value.arrayBuffer()), sizeBytes: value.size, parentId })
   } catch (error) {
-    actionFailure("/files", "upload file version", storageError(error))
+    actionFailure(back, "upload file version", storageError(error))
   }
 
   const { error } = await context.supabase.from("file_versions").insert({ file_id: file.id, workspace_id: context.workspaceId, uploader_id: context.user.id, storage_path: "google-drive:" + uploaded.id, name: value.name, mime_type: value.type, size_bytes: value.size }).select("id").single()
@@ -137,25 +145,28 @@ export async function uploadFileVersion(formData: FormData): Promise<void> {
     } catch (rollbackError) {
       console.error("Could not remove orphaned Google Drive file version")
     }
-    actionFailure("/files", "save file version metadata", error)
+    actionFailure(back, "save file version metadata", error)
   }
   await recordActivity(context, { action: "Uploaded version", entityType: "file", entityId: file.id })
   revalidatePath("/files")
+  revalidatePath(back)
   revalidatePath("/activity")
 }
 
 export async function createFileShare(formData: FormData): Promise<void> {
   const input = z.object({ id: z.string().uuid(), expires: z.enum(["never", "1d", "7d", "30d"]) }).safeParse({ id: formData.get("id"), expires: formData.get("expires") })
   if (!input.success) actionFailure("/files", "share file")
+  const back = "/files/" + input.data.id
   const context = await getWorkspaceContext()
-  if (!context) actionFailure("/files", "access the active workspace")
+  if (!context) actionFailure(back, "access the active workspace")
   const { data: file, error: fileError } = await context.supabase.from("files").select("id").eq("id", input.data.id).eq("workspace_id", context.workspaceId).maybeSingle()
-  if (fileError || !file) actionFailure("/files", "find file", fileError ?? new Error("File not found"))
+  if (fileError || !file) actionFailure(back, "find file", fileError ?? new Error("File not found"))
 
   const token = randomUUID()
   const expiresAt = input.data.expires === "never" ? null : new Date(Date.now() + Number(input.data.expires.slice(0, -1)) * (input.data.expires.endsWith("d") ? 24 * 60 * 60 * 1000 : 0)).toISOString()
   const { error } = await context.supabase.from("file_shares").insert({ file_id: file.id, workspace_id: context.workspaceId, token_hash: createHash("sha256").update(token).digest("hex"), permission: "view", expires_at: expiresAt, created_by: context.user.id })
-  if (error) actionFailure("/files", "share file", error)
+  if (error) actionFailure(back, "share file", error)
   await recordActivity(context, { action: "Shared", entityType: "file", entityId: file.id })
-  redirect("/files?share=" + encodeURIComponent(token))
+  revalidatePath(back)
+  redirect(back + "?share=" + encodeURIComponent(token))
 }
