@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { listMyInvitations } from "@/lib/invitations"
 import { relativeTime } from "@/lib/relative-time"
 import { respondToInvitation } from "./actions"
+import { InvitationResponseButtons } from "@/components/invitation-response-buttons"
 
 const roleLabels: Record<string, string> = { user: "Member", admin: "Admin" }
 
@@ -28,8 +29,7 @@ export default async function InvitesPage() {
               </div>
               <form action={respondToInvitation} className="flex shrink-0 gap-2">
                 <input type="hidden" name="id" value={invitation.id} />
-                <button name="decision" value="decline" className="button-secondary min-h-0 px-3 py-1.5 text-xs">Decline</button>
-                <button name="decision" value="accept" className="button-primary min-h-0 px-3 py-1.5 text-xs">Accept</button>
+                <InvitationResponseButtons />
               </form>
             </li>
           ))}

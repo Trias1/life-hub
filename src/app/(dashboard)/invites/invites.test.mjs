@@ -5,6 +5,7 @@ import test from "node:test"
 const actions = readFileSync(new URL("./actions.ts", import.meta.url), "utf8")
 const migration = readFileSync(new URL("../../../../supabase/migrations/0029_invitee_inbox.sql", import.meta.url), "utf8")
 const banner = readFileSync(new URL("../../../components/invitation-banner.tsx", import.meta.url), "utf8")
+const buttons = readFileSync(new URL("../../../components/invitation-response-buttons.tsx", import.meta.url), "utf8")
 
 test("answering an invitation goes through the database function, not a client-side insert", () => {
   assert.match(actions, /rpc\("respond_to_my_invitation"/)
@@ -27,7 +28,9 @@ test("declined invitations cannot be accepted through the emailed link either", 
   assert.match(linkFlow, /declined_at is null/)
 })
 
-test("the banner offers both answers", () => {
-  assert.match(banner, /value="accept"/)
-  assert.match(banner, /value="decline"/)
+test("the banner offers both answers and locks them while submitting", () => {
+  assert.match(banner, /<InvitationResponseButtons \/>/)
+  assert.match(buttons, /disabled=\{pending\}/)
+  assert.match(buttons, /value="accept"/)
+  assert.match(buttons, /value="decline"/)
 })

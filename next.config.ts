@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "11mb" },
     // Middleware buffers request bodies up to this size; keep it above the 10 MB upload limit.
     proxyClientMaxBodySize: "11mb",
+    // Fewer page-data workers: 19 parallel workers crash the build on Windows (0xC0000409).
+    cpus: 4,
   },
   async headers() {
     return [{

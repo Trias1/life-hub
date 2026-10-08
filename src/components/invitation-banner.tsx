@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Mail } from "lucide-react"
 import { respondToInvitation } from "@/app/(dashboard)/invites/actions"
 import type { MyInvitation } from "@/lib/invitations"
+import { InvitationResponseButtons } from "@/components/invitation-response-buttons"
 
 const roleLabels: Record<string, string> = { user: "a member", admin: "an admin" }
 
@@ -20,8 +21,7 @@ export function InvitationBanner({ invitations }: { invitations: MyInvitation[] 
       <form action={respondToInvitation} className="flex shrink-0 gap-2">
         <input type="hidden" name="id" value={first.id} />
         <input type="hidden" name="returnTo" value="/dashboard" />
-        <button name="decision" value="decline" className="button-secondary min-h-0 px-3 py-1.5 text-xs">Decline</button>
-        <button name="decision" value="accept" className="button-primary min-h-0 px-3 py-1.5 text-xs">Accept</button>
+        <InvitationResponseButtons />
       </form>
     </div>
   )
