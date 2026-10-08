@@ -7,7 +7,7 @@ import { FileKindIcon } from "@/components/files/file-kind-icon"
 import { fileLabel, fileType, fileTypeOptions, fileUrls, formatBytes } from "@/components/files/file-kind"
 import { relativeTime } from "@/lib/relative-time"
 import { getWorkspaceContext } from "@/lib/workspace/server"
-import { DriveNotConnectedError, getStorageForWorkspace } from "@/lib/storage/storage"
+import { DriveNotConnectedError, getCachedDriveUsage } from "@/lib/storage/storage"
 
 type FilesView = "all" | "favorites" | "trash"
 type Layout = "list" | "grid"
@@ -54,7 +54,7 @@ export default async function FilesPage({ searchParams }: { searchParams: Promis
   let storageUsage = { usedBytes: localStorageBytes, limitBytes: Number(workspaceSettings?.storage_limit_bytes ?? 107374182400) }
   let driveConnected = true
   try {
-    const driveUsage = await getStorageForWorkspace(context.workspaceId).getUsage()
+    const driveUsage = await getCachedDriveUsage(context.workspaceId)
     storageUsage = { usedBytes: driveUsage.usedBytes, limitBytes: driveUsage.limitBytes ?? storageUsage.limitBytes }
   } catch (error) {
     if (error instanceof DriveNotConnectedError) driveConnected = false

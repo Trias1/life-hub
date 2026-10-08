@@ -12,7 +12,7 @@ import {
 } from "./_actions/spaces";
 import { selectWorkspace } from "./_actions/workspaces";
 import { markAllNotificationsRead } from "@/app/(dashboard)/notifications/actions";
-import { DriveNotConnectedError, getStorageForWorkspace } from "@/lib/storage/storage"
+import { DriveNotConnectedError, getCachedDriveUsage } from "@/lib/storage/storage"
 import { clearWorkspaceDriveConnection, isGoogleInvalidGrant } from "@/lib/google-drive-auth";
 import { listMyInvitations } from "@/lib/invitations";
 import { InvitationBanner } from "@/components/invitation-banner";
@@ -29,6 +29,7 @@ export default async function DashboardLayout({
     redirect(user ? "/onboarding" : "/login");
   }
 
+  const invitationsPromise = listMyInvitations(context.supabase);
   const [
     { data: workspace },
     { data: workspaces },
@@ -121,7 +122,7 @@ export default async function DashboardLayout({
   );
   let driveConnected = true;
   try {
-    const driveUsage = await getStorageForWorkspace(context.workspaceId).getUsage();
+    const driveUsage = await getCachedDriveUsage(context.workspaceId);
     storageBytes = driveUsage.usedBytes;
     storageLimitBytes = driveUsage.limitBytes ?? storageLimitBytes;
   } catch (error) {
@@ -139,7 +140,7 @@ export default async function DashboardLayout({
       console.error("Could not load Google Drive storage quota")
     }
   }
-  const invitations = await listMyInvitations(context.supabase);
+  const invitations = await invitationsPromise;
   // Skip the avatar request when it lives in this workspace's Drive and that Drive is disconnected.
   const avatarUnavailable = !driveConnected && profile?.avatar_workspace_id === context.workspaceId;
   const avatarUrl = profile?.avatar_google_file_id && !avatarUnavailable

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useMemo, useState } from "react"
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Plus, Repeat } from "lucide-react"
 import { addDaysToKey, addMonthsToKey, colorLabel, colorTone, dayKey, daysInMonthOfKey, formatKeyLong, formatKeyMonth, formatKeyShort, formatTime, repeatLabel, weekdayOfKey } from "@/components/calendar/calendar-format"
@@ -71,8 +72,13 @@ function DayGroups({ groups, todayKey, emptyText }: { groups: Array<[string, Ite
 }
 
 export function CalendarBoard({ events, googleEvents, todayKey, initialView }: Props) {
-  const [view, setViewState] = useState<CalendarView>(initialView)
-  const [cursor, setCursor] = useState(todayKey)
+  // View and date live in the URL, not component state: Next remounts the page when its search
+  // params change, which used to throw the user back to the initial (Agenda) view.
+  const searchParams = useSearchParams()
+  const requestedView = searchParams.get("view")
+  const view: CalendarView = views.some(([key]) => key === requestedView) ? requestedView as CalendarView : initialView
+  const requestedDate = searchParams.get("date")
+  const cursor = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayKey
   const [showPast, setShowPast] = useState(false)
 
   const items = useMemo<Item[]>(() => [
@@ -81,21 +87,24 @@ export function CalendarBoard({ events, googleEvents, todayKey, initialView }: P
   ].sort((a, b) => a.startsAt.localeCompare(b.startsAt)), [events, googleEvents])
   const byDay = useMemo(() => new Map(groupByDay(items)), [items])
 
-  function setView(next: CalendarView) {
-    setViewState(next)
+  // replaceState keeps this client-side (no server round trip); Next syncs useSearchParams from it.
+  function updateUrl(nextView: CalendarView, nextDate: string) {
     const url = new URL(window.location.href)
-    if (next === "agenda") url.searchParams.delete("view")
-    else url.searchParams.set("view", next)
+    if (nextView === "agenda") url.searchParams.delete("view")
+    else url.searchParams.set("view", nextView)
+    if (nextDate === todayKey) url.searchParams.delete("date")
+    else url.searchParams.set("date", nextDate)
     url.searchParams.delete("success")
     url.searchParams.delete("error")
     window.history.replaceState(null, "", url.pathname + url.search)
   }
+  const setView = (next: CalendarView) => updateUrl(next, cursor)
+  const setCursor = (next: string) => updateUrl(view, next)
   function openDay(day: string) {
-    setCursor(day)
-    setView("day")
+    updateUrl("day", day)
   }
   function step(direction: 1 | -1) {
-    setCursor((current) => view === "month" ? addMonthsToKey(current, direction) : addDaysToKey(current, view === "week" ? 7 * direction : direction))
+    setCursor(view === "month" ? addMonthsToKey(cursor, direction) : addDaysToKey(cursor, view === "week" ? 7 * direction : direction))
   }
 
   const upcomingItems = items.filter((item) => item.day >= todayKey)

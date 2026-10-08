@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { notificationEnabled } from "@/lib/notification-preferences.mjs"
@@ -25,7 +26,10 @@ async function deliverNotifications(context: NonNullable<Awaited<ReturnType<type
   return error ? { error } : {}
 }
 
-export async function getWorkspaceContext() {
+// Layout and page both need this; cache() runs it once per request instead of twice.
+export const getWorkspaceContext = cache(loadWorkspaceContext)
+
+async function loadWorkspaceContext() {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) return null

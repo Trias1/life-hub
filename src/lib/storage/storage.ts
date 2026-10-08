@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import type { Readable } from "node:stream"
 
 export type StorageUploadInput = {
@@ -45,6 +46,13 @@ export interface StorageService {
 import { googleDriveStorage } from "./google-drive"
 
 export { DriveNotConnectedError } from "./google-drive"
+
+// Quota calls Google on every page view otherwise. Errors are not cached, so a disconnect still shows up.
+export const getCachedDriveUsage = unstable_cache(
+  async (workspaceId: string) => googleDriveStorage(workspaceId).getUsage(),
+  ["drive-usage"],
+  { revalidate: 300 },
+)
 
 export function getStorageForWorkspace(workspaceId: string): StorageService {
   return googleDriveStorage(workspaceId)
