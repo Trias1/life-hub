@@ -1,4 +1,19 @@
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
+
+const encryptedColumns: Record<string, Array<[string, string]>> = {
+  spaces: [["description", FIELD.SPACE_DESCRIPTION]],
+  notes: [["content", FIELD.NOTE_CONTENT]],
+  tasks: [["description", FIELD.TASK_DESCRIPTION]],
+  calendar: [["description", FIELD.EVENT_DESCRIPTION]],
+}
+
+/** Exports stay human-readable: decrypt the encrypted columns of each exported table. */
+function readable(name: string, data: unknown) {
+  const columns = encryptedColumns[name]
+  if (!columns || !Array.isArray(data)) return data
+  return data.map((row: Record<string, unknown>) => ({ ...row, ...Object.fromEntries(columns.map(([column, family]) => [column, decryptField(family, row[column] as string | null)])) }))
+}
 
 export async function GET() {
   const context = await getWorkspaceContext()
@@ -24,7 +39,7 @@ export async function GET() {
     return Response.json({ error: "Could not export workspace" }, { status: 500 })
   }
 
-  const payload = Object.fromEntries(tables.map(([name], index) => [name, results[index].data]))
+  const payload = Object.fromEntries(tables.map(([name], index) => [name, readable(name, results[index].data)]))
   const slug = String((payload.workspace as { slug?: string } | null)?.slug ?? "workspace").replace(/[^a-z0-9-]/gi, "-")
   return new Response(JSON.stringify({ exported_at: new Date().toISOString(), ...payload }, null, 2), { headers: { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": `attachment; filename=lifehub-${slug}.json` } })
 }

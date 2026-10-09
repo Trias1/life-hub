@@ -123,4 +123,9 @@ assert.match(settingsStudio, /api\/workspace\/export/)
 assert.match(calendarMigration, /reminder_sent_for/)
 assert.match(vercelConfig, /api\/calendar\/reminders/)
 
+const exportRoute = readFileSync(new URL("../src/app/api/workspace/export/route.ts", import.meta.url), "utf8")
+for (const family of ["NOTE_CONTENT", "TASK_DESCRIPTION", "EVENT_DESCRIPTION", "SPACE_DESCRIPTION"]) {
+  assert.match(exportRoute, new RegExp("FIELD\." + family), "export must decrypt " + family)
+}
+
 console.log("LifeHub self-check passed")
