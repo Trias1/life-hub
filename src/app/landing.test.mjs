@@ -4,12 +4,11 @@ import test from "node:test"
 
 const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
 
-test("landing page points to the source, sign in and self-hosting", () => {
+test("landing page points to the source and sign in, without self-hosting steps", () => {
   assert.match(page, /const repo = "https:\/\/github\.com\/Trias1\/life-hub"/)
   assert.match(page, /href=\{repo\}/)
   assert.match(page, /href="\/login"/)
-  assert.match(page, /git clone \$\{repo\}/)
-  assert.match(page, /supabase db push/)
+  for (const pattern of [/git clone/, /supabase db push/, /id="self-host"/, /Host it yourself/]) assert.doesNotMatch(page, pattern)
   assert.match(page, /MIT/)
 })
 

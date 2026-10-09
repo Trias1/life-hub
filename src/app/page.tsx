@@ -51,13 +51,6 @@ const security = [
   "File downloads are checked against your workspace, and share links are hashed and expire.",
 ];
 
-const steps = [
-  { text: "Clone the repository and install dependencies.", code: `git clone ${repo}\ncd life-hub\nnpm install` },
-  { text: "Create a Supabase project and a Google Cloud OAuth client, then fill in the environment file.", code: "cp .env.example .env.local" },
-  { text: "Apply the database migrations.", code: "supabase db push" },
-  { text: "Start the app on http://localhost:3000.", code: "npm run dev" },
-];
-
 export default function Home() {
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -80,7 +73,6 @@ export default function Home() {
         <div className="mt-7 flex flex-wrap gap-2.5">
           <Link href="/login" className="button-primary">Sign in</Link>
           <a href={repo} className="button-secondary">View source on GitHub</a>
-          <a href="#self-host" className="button-secondary">Host it yourself</a>
         </div>
       </section>
 
@@ -153,21 +145,6 @@ export default function Home() {
           </ul>
         </section>
       </div>
-
-      <section id="self-host" aria-labelledby="self-host-title" className="mx-auto w-full max-w-6xl scroll-mt-6 px-4 pb-20 sm:px-6">
-        <h2 id="self-host-title" className="text-xl font-bold">Host it yourself</h2>
-        <p className="mt-3 max-w-2xl leading-7 text-[var(--muted)]">
-          You need Node.js 20 or newer, a Supabase project and a Google Cloud project. The <a href={repo + "#readme"} className="underline underline-offset-4 hover:text-[var(--foreground)]">README</a> lists every environment variable.
-        </p>
-        <ol className="mt-8 grid gap-6 md:grid-cols-2">
-          {steps.map((step, index) => (
-            <li key={step.code} className="min-w-0">
-              <p className="leading-7"><span className="mr-2 font-semibold">{index + 1}.</span>{step.text}</p>
-              <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3 font-mono text-sm leading-6">{step.code}</pre>
-            </li>
-          ))}
-        </ol>
-      </section>
 
       <footer className="border-t border-[var(--line)]">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-[var(--muted)] sm:px-6">
