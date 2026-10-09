@@ -1,5 +1,5 @@
 import { getWorkspaceContext } from "@/lib/workspace/server"
-import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
+import { FIELD, decryptForExport } from "@/lib/data-crypto.mjs"
 
 const encryptedColumns: Record<string, Array<[string, string]>> = {
   spaces: [["description", FIELD.SPACE_DESCRIPTION]],
@@ -12,7 +12,7 @@ const encryptedColumns: Record<string, Array<[string, string]>> = {
 function readable(name: string, data: unknown) {
   const columns = encryptedColumns[name]
   if (!columns || !Array.isArray(data)) return data
-  return data.map((row: Record<string, unknown>) => ({ ...row, ...Object.fromEntries(columns.map(([column, family]) => [column, decryptField(family, row[column] as string | null)])) }))
+  return data.map((row: Record<string, unknown>) => ({ ...row, ...Object.fromEntries(columns.map(([column, family]) => [column, decryptForExport(family, row[column] as string | null)])) }))
 }
 
 export async function GET() {

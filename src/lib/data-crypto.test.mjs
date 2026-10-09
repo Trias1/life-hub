@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { randomBytes } from "node:crypto"
 import test from "node:test"
-import { DataCryptoError, FIELD, decryptField, encryptField, isEncrypted } from "./data-crypto.mjs"
+import { DataCryptoError, FIELD, decryptField, decryptForExport, encryptField, isEncrypted } from "./data-crypto.mjs"
 
 const keyA = randomBytes(32).toString("base64")
 const keyB = randomBytes(32).toString("base64")
@@ -85,4 +85,27 @@ test("isEncrypted recognises only the stored prefix", () => {
   assert.equal(isEncrypted("enc:1:abcd"), true)
   assert.equal(isEncrypted("encrypted text"), false)
   assert.equal(isEncrypted(null), false)
+})
+
+test("plaintext that looks like a stored value is encrypted even with the switch off", () => {
+  env({ DATA_ENCRYPTION_KEY: keyA })
+  const stored = encryptField(FIELD.NOTE_CONTENT, "enc:1:copied-from-the-table")
+  assert.ok(stored.startsWith("enc:1:"))
+  assert.equal(decryptField(FIELD.NOTE_CONTENT, stored), "enc:1:copied-from-the-table")
+  assert.equal(encryptField(FIELD.NOTE_CONTENT, "encrypt me later"), "encrypt me later")
+})
+
+test("an invalid previous key does not break values written with the current key", () => {
+  env({ DATA_ENCRYPTION_KEY: keyA, DATA_ENCRYPTION_WRITE: "on" })
+  const stored = encryptField(FIELD.NOTE_CONTENT, "still readable")
+  env({ DATA_ENCRYPTION_KEY: keyA, DATA_ENCRYPTION_KEY_PREVIOUS: "c2hvcnQ=" })
+  assert.equal(decryptField(FIELD.NOTE_CONTENT, stored), "still readable")
+})
+
+test("export decryption marks an unreadable value instead of failing", () => {
+  env({ DATA_ENCRYPTION_KEY: keyA, DATA_ENCRYPTION_WRITE: "on" })
+  const stored = encryptField(FIELD.NOTE_CONTENT, "fine")
+  env({ DATA_ENCRYPTION_KEY: keyB })
+  assert.equal(decryptForExport(FIELD.NOTE_CONTENT, stored), "[undecryptable]")
+  assert.equal(decryptForExport(FIELD.NOTE_CONTENT, "legacy"), "legacy")
 })

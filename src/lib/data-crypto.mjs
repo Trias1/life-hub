@@ -29,8 +29,18 @@ function loadKey(value) {
   return { key, kid: createHash("sha256").update(key).digest("hex").slice(0, 8) }
 }
 
+/** A bad previous key only loses access to old values; it must not take down reads of current ones. */
+function previousKey() {
+  try {
+    return loadKey(process.env.DATA_ENCRYPTION_KEY_PREVIOUS)
+  } catch {
+    console.error("Ignoring invalid DATA_ENCRYPTION_KEY_PREVIOUS")
+    return null
+  }
+}
+
 function keys() {
-  return [loadKey(process.env.DATA_ENCRYPTION_KEY), loadKey(process.env.DATA_ENCRYPTION_KEY_PREVIOUS)].filter((entry) => entry !== null)
+  return [loadKey(process.env.DATA_ENCRYPTION_KEY), previousKey()].filter((entry) => entry !== null)
 }
 
 /** @param {string} family */
@@ -43,10 +53,14 @@ export function isEncrypted(stored) {
   return typeof stored === "string" && stored.startsWith(PREFIX)
 }
 
-/** Encrypts a field for storage; returns the plaintext unchanged while DATA_ENCRYPTION_WRITE is not "on". @param {string} family @param {string} plaintext */
+/**
+ * Encrypts a field for storage; returns the plaintext unchanged while DATA_ENCRYPTION_WRITE is not "on".
+ * Text that already looks like a stored value is always encrypted, or it would be misread as ciphertext later.
+ * @param {string} family @param {string} plaintext
+ */
 export function encryptField(family, plaintext) {
   assertFamily(family)
-  if (process.env.DATA_ENCRYPTION_WRITE !== "on") return plaintext
+  if (process.env.DATA_ENCRYPTION_WRITE !== "on" && !isEncrypted(plaintext)) return plaintext
   const current = loadKey(process.env.DATA_ENCRYPTION_KEY)
   if (!current) throw new DataCryptoError("Data encryption key is not configured")
   const iv = randomBytes(12)
@@ -72,5 +86,15 @@ export function decryptField(family, stored) {
     return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]).toString("utf8")
   } catch {
     throw new DataCryptoError("Encrypted field failed authentication")
+  }
+}
+
+/** Like decryptField, but one unreadable value must not cost the owner the whole export. @param {string} family @param {string | null | undefined} stored */
+export function decryptForExport(family, stored) {
+  try {
+    return decryptField(family, stored)
+  } catch (error) {
+    if (error instanceof DataCryptoError) return "[undecryptable]"
+    throw error
   }
 }
