@@ -1,71 +1,180 @@
 import Link from "next/link";
-import { ArrowRight, Check, Layers3, Sparkles, Users, Zap } from "lucide-react";
+import {
+  Bookmark,
+  CalendarDays,
+  CircleDot,
+  ClipboardList,
+  Folder,
+  LayoutDashboard,
+  MessageSquare,
+  Notebook,
+  Paperclip,
+  Settings,
+  Users,
+} from "lucide-react";
+import { LabelChip, PriorityChip } from "@/components/tasks/task-chip";
 
-const features = [
-  { icon: Layers3, title: "One calm home", text: "Keep notes, tasks, events, files, and bookmarks connected in one workspace." },
-  { icon: Zap, title: "Move with clarity", text: "See what matters next without noisy dashboards or scattered tools." },
-  { icon: Users, title: "Work together", text: "Invite your team, share files, and keep every workspace conversation in context." },
+const repo = "https://github.com/Trias1/life-hub";
+
+const sidebar = [
+  { icon: LayoutDashboard, label: "Dashboard" },
+  { icon: Notebook, label: "Notes" },
+  { icon: ClipboardList, label: "Tasks", active: true },
+  { icon: CalendarDays, label: "Calendar" },
+  { icon: Folder, label: "Files" },
+  { icon: Bookmark, label: "Bookmarks" },
+  { icon: Users, label: "Team" },
+  { icon: Settings, label: "Settings" },
+];
+
+// Sample rows for the preview, written the way the real Tasks list renders them.
+const tasks = [
+  { title: "Renew the domain before it lapses", priority: "high", label: { name: "admin", color: "rose" }, meta: "In progress · created 3 days ago by You · Due 14 Oct · 1/3 checklist", comments: 2, updated: "updated 2 hours ago" },
+  { title: "Draft the self-hosting guide", priority: "medium", label: { name: "docs", color: "blue" }, meta: "In review · created 5 days ago by Rani · 2/4 checklist", attachments: 1, updated: "updated 3 hours ago" },
+  { title: "Move old notes out of the General folder", priority: "low", meta: "To do · created last week by You", updated: "updated yesterday" },
+  { title: "Compare Drive storage plans", priority: "medium", meta: "To do · created 2 weeks ago by You · Due 20 Oct", updated: "updated 4 days ago" },
+];
+
+const modules = [
+  { name: "Notes", text: "Rich text with images, folders, tags and pins. Every edit keeps a version you can restore." },
+  { name: "Tasks", text: "A list and a board, with labels, due dates, checklists, comments and file attachments." },
+  { name: "Calendar", text: "Agenda, month, week and day views, repeating events and reminders, with your Google Calendar shown alongside." },
+  { name: "Files", text: "Kept in a folder in your own Google Drive, with versions and share links that expire." },
+  { name: "Bookmarks", text: "Titles are filled in from the page. Group them into collections and import or export CSV." },
+  { name: "Team", text: "Separate workspaces with member, admin and owner roles. People accept or decline invitations by email." },
+];
+
+const security = [
+  "Postgres row-level security checks every read and write, not only the app code.",
+  "Free text such as note bodies, task descriptions and comments can be encrypted with AES-256-GCM, using a key that stays on your server.",
+  "Search, uploads, exports and sign-in related endpoints are rate limited.",
+  "File downloads are checked against your workspace, and share links are hashed and expire.",
+];
+
+const steps = [
+  { text: "Clone the repository and install dependencies.", code: `git clone ${repo}\ncd life-hub\nnpm install` },
+  { text: "Create a Supabase project and a Google Cloud OAuth client, then fill in the environment file.", code: "cp .env.example .env.local" },
+  { text: "Apply the database migrations.", code: "supabase db push" },
+  { text: "Start the app on http://localhost:3000.", code: "npm run dev" },
 ];
 
 export default function Home() {
   return (
-    <main className="landing-page min-h-screen overflow-hidden bg-[#070707] text-white">
-      <div className="pointer-events-none fixed inset-0 -z-0 bg-[radial-gradient(circle_at_15%_5%,rgba(120,119,198,0.18),transparent_30%),radial-gradient(circle_at_85%_15%,rgba(45,212,191,0.12),transparent_28%)]" />
-      <nav className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3 font-semibold tracking-tight">
-          <span className="landing-logo grid h-9 w-9 place-items-center rounded-xl text-xs font-black">SC</span>
+    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-5 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5 font-semibold">
+          <span className="brand-mark">SC</span>
           <span>Sanctum Cove</span>
         </Link>
-        <div className="flex items-center gap-3 text-sm">
-          <Link href="/login" className="rounded-full px-4 py-2 text-zinc-300 transition hover:bg-white/10 hover:text-white">Sign in</Link>
-          <Link href="/register" className="landing-cta-primary rounded-full px-4 py-2 font-semibold transition">Get started</Link>
-        </div>
-      </nav>
+        <nav className="flex items-center gap-2 text-sm">
+          <a href={repo} className="px-2 py-1.5 text-[var(--muted)] hover:text-[var(--foreground)]">GitHub</a>
+          <Link href="/login" className="button-secondary min-h-0 px-3 py-1.5">Sign in</Link>
+        </nav>
+      </header>
 
-      <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-14 px-6 pb-20 pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:pb-28 lg:pt-24">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-zinc-300 backdrop-blur">
-            <Sparkles size={14} className="text-teal-300" /> A quieter way to get things done
-          </div>
-          <h1 className="mt-7 max-w-3xl text-5xl font-semibold tracking-[-0.065em] text-white sm:text-6xl lg:text-7xl">
-            Your work and life, finally in one <span className="bg-gradient-to-r from-teal-200 via-white to-violet-300 bg-clip-text text-transparent">clear space.</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-400">
-            Sanctum Cove brings your notes, tasks, calendar, files, and people together so you can focus on the next meaningful thing.
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Link href="/register" className="landing-cta-primary group inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-bold transition hover:-translate-y-0.5">
-              Create your workspace <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <Link href="/login" className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/[0.06]">Explore sign in</Link>
-          </div>
-          <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-500">
-            {['Notes and tasks', 'Calendar and files', 'Team-ready workspace'].map((item) => <span key={item} className="inline-flex items-center gap-1.5"><Check size={14} className="text-teal-300" />{item}</span>)}
-          </div>
+      <section className="mx-auto w-full max-w-6xl px-4 pt-10 sm:px-6 sm:pt-16">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Sanctum Cove</h1>
+        <p className="mt-4 max-w-2xl text-lg leading-8 text-[var(--muted)]">
+          A self-hosted workspace for notes, tasks, a calendar, files and bookmarks. It runs on your own Supabase project, and your files stay in your own Google Drive.
+        </p>
+        <div className="mt-7 flex flex-wrap gap-2.5">
+          <Link href="/login" className="button-primary">Sign in</Link>
+          <a href={repo} className="button-secondary">View source on GitHub</a>
+          <a href="#self-host" className="button-secondary">Host it yourself</a>
         </div>
+      </section>
 
-        <div className="relative mx-auto w-full max-w-xl">
-          <div className="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-violet-500/20 via-transparent to-teal-400/15 blur-3xl" />
-          <div className="relative rounded-[2rem] border border-white/10 bg-white/[0.07] p-3 shadow-2xl shadow-black/50 backdrop-blur-xl">
-            <div className="rounded-[1.45rem] border border-white/10 bg-[#101010] p-4 sm:p-5">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4"><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-400/80" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300/80" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300/80" /></div><span className="text-[10px] uppercase tracking-[0.18em] text-zinc-600">Today</span></div>
-              <div className="grid gap-4 pt-5 sm:grid-cols-[0.85fr_1.15fr]">
-                <div className="space-y-3"><div className="h-20 rounded-2xl bg-gradient-to-br from-violet-500/30 to-violet-500/5 p-4"><p className="text-[10px] uppercase tracking-widest text-violet-200/70">Focus</p><p className="mt-2 text-sm font-semibold">Plan the week</p></div><div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><p className="text-[10px] uppercase tracking-widest text-zinc-500">Progress</p><div className="mt-3 h-1.5 rounded-full bg-white/10"><div className="h-full w-2/3 rounded-full bg-teal-300" /></div><p className="mt-2 text-xs text-zinc-500">6 of 9 tasks complete</p></div></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><div className="flex items-center justify-between"><p className="text-sm font-semibold">Your workspace</p><span className="rounded-full bg-teal-300/10 px-2 py-1 text-[10px] text-teal-200">Live</span></div><div className="mt-5 space-y-3">{['Finalize project brief', 'Review team notes', 'Design sync · 14:00'].map((item, index) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 p-3"><span className={`grid h-6 w-6 place-items-center rounded-lg ${index === 2 ? 'bg-violet-300/15 text-violet-200' : 'bg-teal-300/15 text-teal-200'}`}>{index === 2 ? '•' : <Check size={13} />}</span><span className="text-xs text-zinc-300">{item}</span></div>)}</div></div>
+      <section aria-label="Preview of the Tasks page" className="mx-auto mt-12 w-full max-w-6xl px-4 sm:px-6">
+        <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+          <div className="grid md:grid-cols-[13rem_1fr]">
+            <aside className="hidden border-r border-[var(--line)] p-3 md:block" aria-hidden>
+              <p className="px-2 pb-3 text-sm font-semibold">Personal</p>
+              <ul className="space-y-0.5 text-sm">
+                {sidebar.map(({ icon: Icon, label, active }) => (
+                  <li key={label} className={"flex items-center gap-2.5 rounded-lg px-2 py-1.5 " + (active ? "bg-[var(--surface-muted)] font-semibold text-[var(--foreground)]" : "text-[var(--muted)]")}>
+                    <Icon size={16} aria-hidden />{label}
+                  </li>
+                ))}
+              </ul>
+            </aside>
+            <div className="min-w-0 p-4 sm:p-6">
+              <p className="text-xl font-bold">Tasks</p>
+              <div className="issue-list-head mt-3">
+                <div className="issue-tabs">
+                  <span className="issue-tab is-active">Open <span className="issue-tab-count">4</span></span>
+                  <span className="issue-tab">Closed <span className="issue-tab-count">12</span></span>
+                  <span className="issue-tab">All <span className="issue-tab-count">16</span></span>
+                </div>
               </div>
+              <ul className="issue-list">
+                {tasks.map((task) => (
+                  <li key={task.title} className="issue-row">
+                    <CircleDot size={16} className="issue-row-icon" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="issue-row-title">{task.title}</span>
+                        <PriorityChip priority={task.priority} />
+                        {task.label && <LabelChip name={task.label.name} color={task.label.color} />}
+                      </div>
+                      <p className="issue-row-meta">{task.meta}</p>
+                    </div>
+                    <div className="issue-row-side max-sm:hidden">
+                      <div className="flex items-center gap-2.5">
+                        {task.comments && <span className="inline-flex items-center gap-1"><MessageSquare size={13} aria-hidden />{task.comments}</span>}
+                        {task.attachments && <span className="inline-flex items-center gap-1"><Paperclip size={13} aria-hidden />{task.attachments}</span>}
+                      </div>
+                      <span>{task.updated}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-20 lg:px-8">
-        <div className="grid gap-4 border-y border-white/10 py-5 text-sm text-zinc-500 sm:grid-cols-3 sm:gap-8">
-          <span>Built for deep work</span><span className="sm:text-center">Designed for real teams</span><span className="sm:text-right">Keeps context close</span>
-        </div>
-        <div className="grid gap-4 pt-16 md:grid-cols-3">{features.map(({ icon: Icon, title, text }) => <article key={title} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:-translate-y-1 hover:bg-white/[0.07]"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 text-teal-200"><Icon size={19} /></div><h2 className="mt-6 text-lg font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-zinc-500">{text}</p></article>)}</div>
+      <div className="mx-auto grid w-full max-w-6xl gap-16 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1fr] lg:gap-x-20">
+        <section aria-labelledby="inside">
+          <h2 id="inside" className="text-xl font-bold">What&apos;s inside</h2>
+          <dl className="mt-6 divide-y divide-[var(--line)] border-y border-[var(--line)]">
+            {modules.map((module) => (
+              <div key={module.name} className="grid gap-1 py-4 sm:grid-cols-[7rem_1fr] sm:gap-4">
+                <dt className="font-semibold">{module.name}</dt>
+                <dd className="leading-7 text-[var(--muted)]">{module.text}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <section aria-labelledby="security">
+          <h2 id="security" className="text-xl font-bold">Security</h2>
+          <ul className="mt-6 space-y-4 leading-7 text-[var(--muted)]">
+            {security.map((item) => <li key={item} className="border-l-2 border-[var(--line)] pl-4">{item}</li>)}
+          </ul>
+        </section>
+      </div>
+
+      <section id="self-host" aria-labelledby="self-host-title" className="mx-auto w-full max-w-6xl scroll-mt-6 px-4 pb-20 sm:px-6">
+        <h2 id="self-host-title" className="text-xl font-bold">Host it yourself</h2>
+        <p className="mt-3 max-w-2xl leading-7 text-[var(--muted)]">
+          You need Node.js 20 or newer, a Supabase project and a Google Cloud project. The <a href={repo + "#readme"} className="underline underline-offset-4 hover:text-[var(--foreground)]">README</a> lists every environment variable.
+        </p>
+        <ol className="mt-8 grid gap-6 md:grid-cols-2">
+          {steps.map((step, index) => (
+            <li key={step.code} className="min-w-0">
+              <p className="leading-7"><span className="mr-2 font-semibold">{index + 1}.</span>{step.text}</p>
+              <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3 font-mono text-sm leading-6">{step.code}</pre>
+            </li>
+          ))}
+        </ol>
       </section>
 
-      <section className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 lg:px-8"><div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] border border-white/10 bg-gradient-to-r from-white/[0.09] to-white/[0.03] p-7 sm:p-10 md:flex-row md:items-center"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200">Start with clarity</p><h2 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight">Make space for the work that matters.</h2></div><Link href="/register" className="landing-cta-primary inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-3 text-sm font-bold transition">Get started <ArrowRight size={16} /></Link></div><p className="mt-8 text-center text-xs text-zinc-600">© 2026 Sanctum Cove · A focused workspace for work and life.</p></section>
+      <footer className="border-t border-[var(--line)]">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-[var(--muted)] sm:px-6">
+          <p>Released under the MIT License.</p>
+          <a href={repo} className="hover:text-[var(--foreground)]">Source on GitHub</a>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -821,27 +821,6 @@ html[data-theme="dark"] .field-control:focus {
 }
 
 /* ============================================
-   LANDING
-   ============================================ */
-
-.landing-cta-primary {
-  background: #ffffff !important;
-  color: #09090b !important;
-  border: 1px solid #ffffff;
-}
-
-.landing-cta-primary:hover {
-  background: #e4e4e7 !important;
-  color: #09090b !important;
-  border-color: #e4e4e7;
-}
-
-.landing-logo {
-  background: transparent !important;
-  color: #ffffff !important;
-}
-
-/* ============================================
    WORKSPACE SWITCH CURRENT - LIGHT & DARK FIX
    ============================================ */
 
