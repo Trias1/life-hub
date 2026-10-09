@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { createNotification, getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
+import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 
 // DateTimePicker submits "YYYY-MM-DDTHH:mm" with no zone: read it as Jakarta wall time, whatever zone the server runs in.
 const jakartaDate = z.preprocess((value) => typeof value === "string" && /^d{4}-d{2}-d{2}Td{2}:d{2}(:d{2})?$/.test(value) ? value + "+07:00" : value, z.coerce.date())
@@ -29,7 +30,7 @@ export async function createEvent(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/calendar/new", "access the active workspace")
 
-  const { data: event, error } = await context.supabase.from("calendar_events").insert({ title: input.data.title, description: input.data.description, starts_at: input.data.startsAt.toISOString(), ends_at: input.data.endsAt.toISOString(), recurrence_rule: input.data.recurrence ?? null, color: input.data.color, reminder_minutes: input.data.reminder, workspace_id: context.workspaceId, creator_id: context.user.id }).select("id").single()
+  const { data: event, error } = await context.supabase.from("calendar_events").insert({ title: input.data.title, description: encryptField(FIELD.EVENT_DESCRIPTION, input.data.description), starts_at: input.data.startsAt.toISOString(), ends_at: input.data.endsAt.toISOString(), recurrence_rule: input.data.recurrence ?? null, color: input.data.color, reminder_minutes: input.data.reminder, workspace_id: context.workspaceId, creator_id: context.user.id }).select("id").single()
   if (error) actionFailure("/calendar/new", "create event", error)
   await recordActivity(context, { action: "Created", entityType: "calendar event", entityId: event.id })
   revalidatePath("/calendar")
@@ -46,7 +47,7 @@ export async function updateEvent(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure(eventPath, "access the active workspace")
 
-  const { data: event, error } = await context.supabase.from("calendar_events").update({ title: input.data.title, description: input.data.description, starts_at: input.data.startsAt.toISOString(), ends_at: input.data.endsAt.toISOString(), recurrence_rule: input.data.recurrence ?? null, color: input.data.color, reminder_minutes: input.data.reminder, reminder_sent_for: null }).eq("id", id.data).eq("workspace_id", context.workspaceId).eq("creator_id", context.user.id).select("id").single()
+  const { data: event, error } = await context.supabase.from("calendar_events").update({ title: input.data.title, description: encryptField(FIELD.EVENT_DESCRIPTION, input.data.description), starts_at: input.data.startsAt.toISOString(), ends_at: input.data.endsAt.toISOString(), recurrence_rule: input.data.recurrence ?? null, color: input.data.color, reminder_minutes: input.data.reminder, reminder_sent_for: null }).eq("id", id.data).eq("workspace_id", context.workspaceId).eq("creator_id", context.user.id).select("id").single()
   if (error) actionFailure(eventPath, "update event", error)
   await recordActivity(context, { action: "Updated", entityType: "calendar event", entityId: event.id })
   revalidatePath("/calendar")

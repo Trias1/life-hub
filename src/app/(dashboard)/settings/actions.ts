@@ -6,6 +6,7 @@ import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getStorageForWorkspace } from "@/lib/storage/storage"
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { disconnectWorkspaceDriveConnection, disconnectGoogleAccount } from "@/lib/google-drive-auth"
 
@@ -41,7 +42,7 @@ export async function updateProfile(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure(returnPath, "access the active workspace")
 
-  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, display_name: input.data.displayName, username: input.data.username || null, bio: input.data.bio, updated_at: new Date().toISOString() })
+  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, display_name: input.data.displayName, username: input.data.username || null, bio: encryptField(FIELD.PROFILE_BIO, input.data.bio), updated_at: new Date().toISOString() })
   if (error) actionFailure(returnPath, "save profile", error)
   revalidatePath("/settings")
   revalidatePath("/profile")

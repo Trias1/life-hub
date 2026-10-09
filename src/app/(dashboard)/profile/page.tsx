@@ -1,4 +1,5 @@
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { ProfileStudio } from "@/components/profile-studio"
 import { disconnectGoogleAccountAction, updateProfile, uploadProfileAvatar } from "../settings/actions"
 import { hasGoogleAccountConnection } from "@/lib/google-drive-auth"
@@ -11,6 +12,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const params = await searchParams
   const googleConnected = await hasGoogleAccountConnection(user.id)
   const { data: profile } = await supabase.from("profiles").select("display_name,username,bio,avatar_url,avatar_google_file_id,updated_at").eq("id", user.id).maybeSingle()
+  const profileView = profile ? { ...profile, bio: decryptField(FIELD.PROFILE_BIO, profile.bio) } : profile
   const avatarUrl = profile?.avatar_google_file_id ? "/api/profile/avatar?v=" + encodeURIComponent(profile.updated_at ?? "") : null
   const membership = { workspace_id: context.workspaceId }
   const [notes, tasks, files, logs] = membership ? await Promise.all([
@@ -20,5 +22,5 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     supabase.from("activity_logs").select("action,entity_type,created_at").eq("workspace_id", membership.workspace_id).eq("actor_id", user.id).order("created_at", { ascending: false }).limit(2),
   ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
   const activity = [...(notes.data ?? []).map((item) => ({ label: item.title, detail: "Updated note", time: new Date(item.updated_at).toLocaleDateString() })), ...(tasks.data ?? []).map((item) => ({ label: item.title, detail: item.status + " task", time: new Date(item.updated_at).toLocaleDateString() })), ...(files.data ?? []).map((item) => ({ label: item.name, detail: "Workspace file", time: new Date(item.updated_at).toLocaleDateString() })), ...(logs.data ?? []).map((item) => ({ label: item.action, detail: item.entity_type, time: new Date(item.created_at).toLocaleDateString() }))].slice(0, 8)
-  return <ProfileStudio email={user.email ?? ""} profile={profile} avatarUrl={avatarUrl} activity={activity} updateProfile={updateProfile} uploadProfileAvatar={uploadProfileAvatar} googleConnected={googleConnected} googleStatus={params.google ?? null} disconnectGoogle={disconnectGoogleAccountAction} />
+  return <ProfileStudio email={user.email ?? ""} profile={profileView} avatarUrl={avatarUrl} activity={activity} updateProfile={updateProfile} uploadProfileAvatar={uploadProfileAvatar} googleConnected={googleConnected} googleStatus={params.google ?? null} disconnectGoogle={disconnectGoogleAccountAction} />
 }

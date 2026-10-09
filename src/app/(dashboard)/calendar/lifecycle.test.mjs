@@ -60,3 +60,8 @@ test("calendar routes: list, new form and issue-style detail", () => {
   for (const view of ["agenda", "month", "week", "day"]) assert.match(board, new RegExp(`"${view}"`));
   assert.match(board, /\/calendar\/new\?date=/);
 });
+
+test("event descriptions are encrypted at rest", () => {
+  assert.equal((actions.match(/description: encryptField\(FIELD\.EVENT_DESCRIPTION, input\.data\.description\)/g) ?? []).length, 2)
+  assert.match(detailPage, /decryptField\(FIELD\.EVENT_DESCRIPTION, event\.description\)/)
+})

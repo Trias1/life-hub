@@ -7,6 +7,7 @@ import { expandCalendarEvents } from "@/lib/calendar/recurrence"
 import { formatDateTime } from "@/lib/format-date"
 import { relativeTime } from "@/lib/relative-time"
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { addEventAttendee, deleteEvent, removeEventAttendee, respondEventAttendee, updateEvent } from "../actions"
 
 function activityText(action: string) {
@@ -29,6 +30,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
     .eq("workspace_id", context.workspaceId)
     .maybeSingle()
   if (!event) notFound()
+  const description = decryptField(FIELD.EVENT_DESCRIPTION, event.description)
 
   const [{ data: attendees }, { data: members }, { data: activityRows }, { data: profile }] = await Promise.all([
     context.supabase.from("calendar_event_attendees").select("id,event_id,user_id,email,response").eq("event_id", event.id),
@@ -57,7 +59,7 @@ export default async function EventPage({ params, searchParams }: { params: Prom
       {success && <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
       <div className="mt-5">
         <EventDetail
-          event={{ id: event.id, title: event.title, description: event.description ?? "", starts_at: event.starts_at, ends_at: event.ends_at, recurrence_rule: event.recurrence_rule, color: event.color, reminder_minutes: event.reminder_minutes }}
+          event={{ id: event.id, title: event.title, description, starts_at: event.starts_at, ends_at: event.ends_at, recurrence_rule: event.recurrence_rule, color: event.color, reminder_minutes: event.reminder_minutes }}
           state={state}
           canEdit={isCreator}
           creatorName={nameFor(event.creator_id)}
