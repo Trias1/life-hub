@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { z } from "zod"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { NoteDetail } from "@/components/notes/note-detail"
 import { relativeTime } from "@/lib/relative-time"
 import { formatDateTime } from "@/lib/format-date"
@@ -21,6 +22,7 @@ export default async function NotePage({ params, searchParams }: { params: Promi
     .eq("workspace_id", context.workspaceId)
     .maybeSingle()
   if (!note) notFound()
+  const content = decryptField(FIELD.NOTE_CONTENT, note.content)
 
   const [{ data: versions }, { data: folderRows }, { data: profile }] = await Promise.all([
     context.supabase.from("note_versions").select("id,title,created_at").eq("note_id", note.id).order("created_at", { ascending: false }).limit(20),
@@ -44,7 +46,7 @@ export default async function NotePage({ params, searchParams }: { params: Promi
       {success && <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
       <div className="mt-5">
         <NoteDetail
-          note={{ ...note, tags: note.tags ?? [] }}
+          note={{ ...note, content, tags: note.tags ?? [] }}
           versions={(versions ?? []).map((version) => ({ id: version.id, title: version.title, createdAt: formatDateTime(version.created_at), createdIso: version.created_at, createdLabel: relativeTime(version.created_at, now) }))}
           workspaceId={context.workspaceId}
           folders={Array.from(new Set((folderRows ?? []).map((row) => row.folder)))}

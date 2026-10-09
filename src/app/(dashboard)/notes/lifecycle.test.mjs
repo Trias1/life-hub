@@ -62,3 +62,14 @@ test("note edits stay scoped to the author in the active workspace", () => {
   assert.match(source, /eq\(["']workspace_id["'], context\.workspaceId\)/);
   assert.match(source, /eq\(["']author_id["'], context\.user\.id\)/);
 });
+
+test("note content is encrypted on write and decrypted on read", () => {
+  assert.match(actions, /from "@\/lib\/data-crypto\.mjs"/)
+  assert.match(actionSource("createNote", "updateNote"), /content: encryptField\(FIELD\.NOTE_CONTENT, input\.data\.content\)/)
+  const update = actionSource("updateNote", "restoreNoteVersion")
+  assert.match(update, /const oldContent = decryptField\(FIELD\.NOTE_CONTENT, note\.content\)/)
+  assert.match(update, /oldContent !== input\.data\.content/)
+  assert.match(update, /content: encryptField\(FIELD\.NOTE_CONTENT, input\.data\.content\)/)
+  assert.match(actionSource("restoreNoteVersion", "archiveNote"), /decryptField\(FIELD\.NOTE_CONTENT, version\.content\)/)
+  assert.match(page, /decryptField\(FIELD\.NOTE_CONTENT, note\.content\)/)
+})

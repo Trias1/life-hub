@@ -32,7 +32,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     return query
   }
 
-  let notesQuery = supabase.from("notes").select("id,title,content,folder,tags,is_favorite,created_at,updated_at").eq("workspace_id", context.workspaceId)
+  let notesQuery = supabase.from("notes").select("id,title,folder,tags,is_favorite,created_at,updated_at").eq("workspace_id", context.workspaceId)
   if (view === "active") notesQuery = notesQuery.is("deleted_at", null).is("archived_at", null)
   if (view === "archived") notesQuery = notesQuery.is("deleted_at", null).not("archived_at", "is", null)
   if (view === "trash") notesQuery = notesQuery.not("deleted_at", "is", null)

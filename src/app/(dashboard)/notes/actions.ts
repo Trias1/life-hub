@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
+import { FIELD, decryptField, encryptField } from "@/lib/data-crypto.mjs"
 
 const noteSchema = z.object({ title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80), tags: z.string().max(500) })
 const updateSchema = z.object({ id: z.string().uuid(), title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80).optional(), tags: z.string().max(500).optional() })
@@ -22,7 +23,7 @@ export async function createNote(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/notes/new", "access the active workspace")
 
-  const { data: note, error } = await context.supabase.from("notes").insert({ title: input.data.title, content: input.data.content, folder: input.data.folder, tags: parseTags(input.data.tags), workspace_id: context.workspaceId, author_id: context.user.id }).select("id").single()
+  const { data: note, error } = await context.supabase.from("notes").insert({ title: input.data.title, content: encryptField(FIELD.NOTE_CONTENT, input.data.content), folder: input.data.folder, tags: parseTags(input.data.tags), workspace_id: context.workspaceId, author_id: context.user.id }).select("id").single()
   if (error) actionFailure("/notes/new", "save note", error)
   await recordActivity(context, { action: "Created", entityType: "note", entityId: note.id })
   revalidatePath("/notes")
@@ -40,11 +41,12 @@ export async function updateNote(formData: FormData): Promise<NoteActionResult> 
   if (noteError || !note) return { error: "Only the note author can edit this note." }
   const folder = input.data.folder ?? note.folder
   const tags = input.data.tags === undefined ? note.tags : parseTags(input.data.tags)
-  const textChanged = note.title !== input.data.title || note.content !== input.data.content
+  const oldContent = decryptField(FIELD.NOTE_CONTENT, note.content)
+  const textChanged = note.title !== input.data.title || oldContent !== input.data.content
   const detailsChanged = folder !== note.folder || JSON.stringify(tags) !== JSON.stringify(note.tags)
-  if (!textChanged && !detailsChanged) return { title: note.title, content: note.content }
+  if (!textChanged && !detailsChanged) return { title: note.title, content: oldContent }
 
-  const { error: updateError } = await context.supabase.from("notes").update({ title: input.data.title, content: input.data.content, folder, tags, updated_at: new Date().toISOString() }).eq("id", note.id).eq("author_id", context.user.id)
+  const { error: updateError } = await context.supabase.from("notes").update({ title: input.data.title, content: encryptField(FIELD.NOTE_CONTENT, input.data.content), folder, tags, updated_at: new Date().toISOString() }).eq("id", note.id).eq("author_id", context.user.id)
   if (updateError) return { error: "Note could not be saved." }
   revalidatePath("/notes/" + note.id)
   if (!textChanged) {
@@ -70,7 +72,7 @@ export async function restoreNoteVersion(formData: FormData): Promise<NoteAction
   const data = new FormData()
   data.set("id", input.data.noteId)
   data.set("title", version.title)
-  data.set("content", version.content)
+  data.set("content", decryptField(FIELD.NOTE_CONTENT, version.content))
   return updateNote(data)
 }
 
