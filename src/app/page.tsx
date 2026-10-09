@@ -148,7 +148,7 @@ export default function Home() {
 
       <footer className="border-t border-[var(--line)]">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-[var(--muted)] sm:px-6">
-          <p>Released under the MIT License.</p>
+          <p>Built by Trias. Released under the MIT License.</p>
           <a href={repo} className="hover:text-[var(--foreground)]">Source on GitHub</a>
         </div>
       </footer>

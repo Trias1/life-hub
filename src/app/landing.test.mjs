@@ -10,6 +10,7 @@ test("landing page points to the source and sign in, without self-hosting steps"
   assert.match(page, /href="\/login"/)
   for (const pattern of [/git clone/, /supabase db push/, /id="self-host"/, /Host it yourself/]) assert.doesNotMatch(page, pattern)
   assert.match(page, /MIT/)
+  assert.match(page, /Built by Trias/)
 })
 
 test("landing page uses the app's own theme instead of decorative effects", () => {
