@@ -6,6 +6,7 @@ import { memberName, statusLabel, todayKey, isOpenStatus, type TaskStatus } from
 import { formatDate, formatDateTime } from "@/lib/format-date"
 import { relativeTime } from "@/lib/relative-time"
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import {
   assignTask, attachTaskFile, createChecklistItem, createTaskComment, createTaskLabel, deleteTaskPermanently, detachTaskFile,
   restoreTask, toggleChecklistItem, toggleTaskLabel, trashTask, updateTask, updateTaskStatus,
@@ -34,6 +35,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
     .eq("workspace_id", context.workspaceId)
     .maybeSingle()
   if (!task) notFound()
+  const description = decryptField(FIELD.TASK_DESCRIPTION, task.description)
 
   const [{ data: members }, { data: labels }, { data: assignments }, { data: checklist }, { data: comments }, { data: attachmentRows }, { data: timeline }, { data: availableFiles }, { data: profile }] = await Promise.all([
     supabase.from("workspace_members").select("user_id,role").eq("workspace_id", context.workspaceId).order("created_at"),
@@ -61,7 +63,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   // Comments are shown in full, so their "Commented on" log entries would only repeat them.
   const activity: TaskActivityItem[] = [
     ...(timeline ?? []).filter((item) => item.action !== "Commented on").map((item) => ({ kind: "event" as const, id: item.id, author: nameOf(item.actor_id), text: describe(item.action), sortKey: item.created_at, ...stamp(item.created_at) })),
-    ...(comments ?? []).map((comment) => ({ kind: "comment" as const, id: comment.id, author: nameOf(comment.author_id), text: comment.body, sortKey: comment.created_at, ...stamp(comment.created_at) })),
+    ...(comments ?? []).map((comment) => ({ kind: "comment" as const, id: comment.id, author: nameOf(comment.author_id), text: decryptField(FIELD.TASK_COMMENT_BODY, comment.body), sortKey: comment.created_at, ...stamp(comment.created_at) })),
   ].sort((a, b) => a.sortKey.localeCompare(b.sortKey))
   const state = task.deleted_at ? "trash" : isOpenStatus(task.status) ? "open" : "closed"
   const backHref = state === "trash" ? "/tasks?view=trash" : state === "closed" ? "/tasks?view=closed" : "/tasks"
@@ -77,7 +79,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
       {success && <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
       <div className="mt-5">
         <TaskDetails
-          task={{ id: task.id, title: task.title, description: task.description ?? "", status: task.status as TaskStatus, priority: task.priority, dueDate: task.due_date, assigneeId: task.assignee_id }}
+          task={{ id: task.id, title: task.title, description, status: task.status as TaskStatus, priority: task.priority, dueDate: task.due_date, assigneeId: task.assignee_id }}
           state={state}
           workspaceId={context.workspaceId}
           canDeletePermanently={task.created_by === context.user.id}

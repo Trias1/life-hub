@@ -16,7 +16,7 @@ function actionSource(name, nextName) {
 }
 
 test("active tasks support validated editing and soft deletion", () => {
-  assert.match(actionSource("updateTask", "trashTask"), /description: input\.data\.description/)
+  assert.match(actionSource("updateTask", "trashTask"), /description: encryptField\(FIELD\.TASK_DESCRIPTION, input\.data\.description\)/)
   assert.match(actionSource("trashTask", "restoreTask"), /deleted_at: now/)
   assert.match(actionSource("restoreTask", "deleteTaskPermanently"), /deleted_at: null/)
 })
@@ -59,4 +59,14 @@ test("task detail page exposes restore and permanent delete controls", () => {
   assert.match(detail, /action=\{actions\.restoreTask\}/)
   assert.match(detail, /action=\{actions\.deleteTaskPermanently\}/)
   assert.match(detail, />Delete permanently<\/button>/)
+})
+
+test("task description and comments are encrypted at rest", () => {
+  assert.equal((actions.match(/description: encryptField\(FIELD\.TASK_DESCRIPTION, input\.data\.description\)/g) ?? []).length, 2)
+  assert.match(actions, /body: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(2500\)/)
+  assert.match(actions, /const body = encryptField\(FIELD\.TASK_COMMENT_BODY, input\.data\.body\)/)
+  assert.match(actions, /if \(body\.length > 4000\) actionFailure\(back, "add task comment"\)/)
+  assert.match(detailPage, /decryptField\(FIELD\.TASK_DESCRIPTION, task\.description\)/)
+  assert.match(detailPage, /decryptField\(FIELD\.TASK_COMMENT_BODY, comment\.body\)/)
+  assert.match(detail, /maxLength=\{2500\}/)
 })

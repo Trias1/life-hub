@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
+import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 
 const taskSchema = z.object({ title: z.string().trim().min(1).max(160), description: z.string().trim().max(10000), priority: z.enum(["low", "medium", "high"]), dueDate: z.iso.date().optional(), assigneeId: z.string().uuid().optional(), labelIds: z.array(z.string().uuid()).max(20) })
 const taskEditSchema = z.object({ taskId: z.string().uuid(), title: z.string().trim().min(1).max(160), description: z.string().trim().max(10000), priority: z.enum(["low", "medium", "high"]), dueDate: z.union([z.literal(""), z.iso.date()]) })
@@ -37,7 +38,7 @@ export async function createTask(formData: FormData): Promise<void> {
     const { data: labels, error: labelError } = await context.supabase.from("task_labels").select("id").eq("workspace_id", context.workspaceId).in("id", input.data.labelIds)
     if (labelError || (labels ?? []).length !== input.data.labelIds.length) actionFailure("/tasks/new", "add task labels", labelError ?? new Error("Label not found"))
   }
-  const { data: task, error } = await context.supabase.from("tasks").insert({ title: input.data.title, description: input.data.description, priority: input.data.priority, due_date: input.data.dueDate || null, assignee_id: input.data.assigneeId || null, created_by: context.user.id, workspace_id: context.workspaceId }).select("id").single()
+  const { data: task, error } = await context.supabase.from("tasks").insert({ title: input.data.title, description: encryptField(FIELD.TASK_DESCRIPTION, input.data.description), priority: input.data.priority, due_date: input.data.dueDate || null, assignee_id: input.data.assigneeId || null, created_by: context.user.id, workspace_id: context.workspaceId }).select("id").single()
   if (error) actionFailure("/tasks/new", "create task", error)
   if (input.data.labelIds.length) {
     const { error: assignmentError } = await context.supabase.from("task_label_assignments").insert(input.data.labelIds.map((labelId) => ({ task_id: task.id, label_id: labelId })))
@@ -69,7 +70,7 @@ export async function updateTask(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure(back, "access the active workspace")
 
-  const { data: task, error } = await context.supabase.from("tasks").update({ title: input.data.title, description: input.data.description, priority: input.data.priority, due_date: input.data.dueDate || null, updated_at: new Date().toISOString() }).eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).is("deleted_at", null).select("id,title").maybeSingle()
+  const { data: task, error } = await context.supabase.from("tasks").update({ title: input.data.title, description: encryptField(FIELD.TASK_DESCRIPTION, input.data.description), priority: input.data.priority, due_date: input.data.dueDate || null, updated_at: new Date().toISOString() }).eq("id", input.data.taskId).eq("workspace_id", context.workspaceId).is("deleted_at", null).select("id,title").maybeSingle()
   if (error || !task) actionFailure(back, "update task", error ?? new Error("Task not found"))
   await recordActivity(context, { action: "Updated", entityType: "task", entityId: task.id, resourceName: task.title, link: "/tasks/" + task.id })
   refresh(task.id)
@@ -197,10 +198,13 @@ export async function toggleChecklistItem(formData: FormData): Promise<void> {
 }
 
 export async function createTaskComment(formData: FormData): Promise<void> {
-  const input = z.object({ taskId: z.string().uuid(), body: z.string().trim().min(1).max(4000) }).safeParse({ taskId: formData.get("taskId"), body: formData.get("body") })
+  const input = z.object({ taskId: z.string().uuid(), body: z.string().trim().min(1).max(2500) }).safeParse({ taskId: formData.get("taskId"), body: formData.get("body") })
   if (!input.success) actionFailure(taskPath(formData.get("taskId")), "add task comment")
   const { context, back } = await getTaskContext(formData, "add task comment")
-  const { error } = await context.supabase.from("task_comments").insert({ task_id: input.data.taskId, author_id: context.user.id, body: input.data.body })
+  // task_comments.body has a 4000-character CHECK; ciphertext is longer than the text, so refuse before the database does.
+  const body = encryptField(FIELD.TASK_COMMENT_BODY, input.data.body)
+  if (body.length > 4000) actionFailure(back, "add task comment")
+  const { error } = await context.supabase.from("task_comments").insert({ task_id: input.data.taskId, author_id: context.user.id, body })
   if (error) actionFailure(back, "add task comment", error)
   await recordActivity(context, { action: "Commented on", entityType: "task", entityId: input.data.taskId, link: "/tasks/" + input.data.taskId })
   refresh(input.data.taskId)
