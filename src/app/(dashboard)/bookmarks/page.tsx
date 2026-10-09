@@ -8,6 +8,7 @@ import { BookmarkListMenu } from "@/components/bookmarks/bookmark-list-menu"
 import { bookmarkHost } from "@/components/bookmarks/bookmark-utils"
 import { relativeTime } from "@/lib/relative-time"
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { importBookmarks } from "./actions"
 
 type BookmarksView = "active" | "favorites" | "archived"
@@ -45,7 +46,7 @@ export default async function BookmarksPage({ searchParams }: { searchParams: Pr
     .select("id,title,url,collection,tags,is_favorite,archived_at,created_at,updated_at")
     .eq("workspace_id", context.workspaceId)
     .order("created_at", { ascending: false })
-  const source = allBookmarks ?? []
+  const source = (allBookmarks ?? []).map((bookmark) => ({ ...bookmark, url: decryptField(FIELD.BOOKMARK_URL, bookmark.url) }))
   const inView = (bookmark: (typeof source)[number], state: BookmarksView) =>
     state === "archived" ? Boolean(bookmark.archived_at) : !bookmark.archived_at && (state === "active" || bookmark.is_favorite)
   const counts = {

@@ -6,6 +6,7 @@ const encryptedColumns: Record<string, Array<[string, string]>> = {
   notes: [["content", FIELD.NOTE_CONTENT]],
   tasks: [["description", FIELD.TASK_DESCRIPTION]],
   calendar: [["description", FIELD.EVENT_DESCRIPTION]],
+  bookmarks: [["url", FIELD.BOOKMARK_URL]],
 }
 
 /** Exports stay human-readable: decrypt the encrypted columns of each exported table. */

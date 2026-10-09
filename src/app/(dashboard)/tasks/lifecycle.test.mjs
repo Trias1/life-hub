@@ -63,10 +63,16 @@ test("task detail page exposes restore and permanent delete controls", () => {
 
 test("task description and comments are encrypted at rest", () => {
   assert.equal((actions.match(/description: encryptField\(FIELD\.TASK_DESCRIPTION, input\.data\.description\)/g) ?? []).length, 2)
-  assert.match(actions, /body: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(2500\)/)
+  assert.match(actions, /body: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(4000\)/)
   assert.match(actions, /const body = encryptField\(FIELD\.TASK_COMMENT_BODY, input\.data\.body\)/)
-  assert.match(actions, /if \(body\.length > 4000\) actionFailure\(back, "add task comment"\)/)
+  assert.match(actions, /if \(body\.length > 12000\) actionFailure\(back, "add task comment"\)/)
   assert.match(detailPage, /decryptField\(FIELD\.TASK_DESCRIPTION, task\.description\)/)
   assert.match(detailPage, /decryptField\(FIELD\.TASK_COMMENT_BODY, comment\.body\)/)
-  assert.match(detail, /maxLength=\{2500\}/)
+  assert.match(detail, /maxLength=\{4000\} name="body"/)
+})
+
+test("checklist item titles are encrypted at rest", () => {
+  assert.match(actions, /const title = encryptField\(FIELD\.CHECKLIST_TITLE, input\.data\.title\)/)
+  assert.match(actions, /if \(title\.length > 2000\) actionFailure\(back, "create checklist item"\)/)
+  assert.match(detailPage, /decryptField\(FIELD\.CHECKLIST_TITLE, item\.title\)/)
 })

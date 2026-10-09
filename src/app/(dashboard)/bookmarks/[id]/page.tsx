@@ -5,6 +5,7 @@ import { BookmarkDetail } from "@/components/bookmarks/bookmark-detail"
 import { relativeTime } from "@/lib/relative-time"
 import { formatDateTime } from "@/lib/format-date"
 import { getWorkspaceContext } from "@/lib/workspace/server"
+import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { archiveBookmark, restoreBookmark, toggleBookmarkFavorite, updateBookmark } from "../actions"
 
 const activityText: Record<string, string> = { Created: "added this bookmark", Updated: "edited this bookmark", Archived: "archived this bookmark", Restored: "restored this bookmark" }
@@ -50,7 +51,7 @@ export default async function BookmarkPage({ params, searchParams }: { params: P
       {success && <p role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</p>}
       <div className="mt-5">
         <BookmarkDetail
-          bookmark={{ id: bookmark.id, title: bookmark.title, url: bookmark.url, collection: bookmark.collection, tags: bookmark.tags ?? [], is_favorite: bookmark.is_favorite, archived_at: bookmark.archived_at }}
+          bookmark={{ id: bookmark.id, title: bookmark.title, url: decryptField(FIELD.BOOKMARK_URL, bookmark.url), collection: bookmark.collection, tags: bookmark.tags ?? [], is_favorite: bookmark.is_favorite, archived_at: bookmark.archived_at }}
           collections={Array.from(new Set((collectionRows ?? []).map((row) => row.collection))).sort()}
           canEdit={isCreator}
           creatorName={nameFor(bookmark.creator_id)}

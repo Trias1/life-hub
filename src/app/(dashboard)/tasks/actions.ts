@@ -175,7 +175,10 @@ export async function createChecklistItem(formData: FormData): Promise<void> {
   const input = z.object({ taskId: z.string().uuid(), title: z.string().trim().min(1).max(240) }).safeParse({ taskId: formData.get("taskId"), title: formData.get("title") })
   if (!input.success) actionFailure(taskPath(formData.get("taskId")), "create checklist item")
   const { context, back } = await getTaskContext(formData, "create checklist item")
-  const { error } = await context.supabase.from("task_checklist_items").insert({ task_id: input.data.taskId, title: input.data.title, created_by: context.user.id })
+  // task_checklist_items.title allows 2000 characters for encrypted values (0031).
+  const title = encryptField(FIELD.CHECKLIST_TITLE, input.data.title)
+  if (title.length > 2000) actionFailure(back, "create checklist item")
+  const { error } = await context.supabase.from("task_checklist_items").insert({ task_id: input.data.taskId, title, created_by: context.user.id })
   if (error) actionFailure(back, "create checklist item", error)
   await recordActivity(context, { action: "Added checklist item to", entityType: "task", entityId: input.data.taskId })
   refresh(input.data.taskId)
@@ -198,12 +201,12 @@ export async function toggleChecklistItem(formData: FormData): Promise<void> {
 }
 
 export async function createTaskComment(formData: FormData): Promise<void> {
-  const input = z.object({ taskId: z.string().uuid(), body: z.string().trim().min(1).max(2500) }).safeParse({ taskId: formData.get("taskId"), body: formData.get("body") })
+  const input = z.object({ taskId: z.string().uuid(), body: z.string().trim().min(1).max(4000) }).safeParse({ taskId: formData.get("taskId"), body: formData.get("body") })
   if (!input.success) actionFailure(taskPath(formData.get("taskId")), "add task comment")
   const { context, back } = await getTaskContext(formData, "add task comment")
-  // task_comments.body has a 4000-character CHECK; ciphertext is longer than the text, so refuse before the database does.
+  // task_comments.body allows 12000 characters for encrypted values (0031); refuse before the database does.
   const body = encryptField(FIELD.TASK_COMMENT_BODY, input.data.body)
-  if (body.length > 4000) actionFailure(back, "add task comment")
+  if (body.length > 12000) actionFailure(back, "add task comment")
   const { error } = await context.supabase.from("task_comments").insert({ task_id: input.data.taskId, author_id: context.user.id, body })
   if (error) actionFailure(back, "add task comment", error)
   await recordActivity(context, { action: "Commented on", entityType: "task", entityId: input.data.taskId, link: "/tasks/" + input.data.taskId })

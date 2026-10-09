@@ -78,7 +78,7 @@ test("missing or malformed key fails without leaking the value", () => {
 
 test("unknown field family is rejected", () => {
   env({ DATA_ENCRYPTION_KEY: keyA, DATA_ENCRYPTION_WRITE: "on" })
-  assert.throws(() => encryptField("bookmark.url", "x"), DataCryptoError)
+  assert.throws(() => encryptField("nope.field", "x"), DataCryptoError)
 })
 
 test("isEncrypted recognises only the stored prefix", () => {
@@ -108,4 +108,12 @@ test("export decryption marks an unreadable value instead of failing", () => {
   env({ DATA_ENCRYPTION_KEY: keyB })
   assert.equal(decryptForExport(FIELD.NOTE_CONTENT, stored), "[undecryptable]")
   assert.equal(decryptForExport(FIELD.NOTE_CONTENT, "legacy"), "legacy")
+})
+
+test("bookmark URLs and checklist titles have their own field families", () => {
+  env({ DATA_ENCRYPTION_KEY: keyA, DATA_ENCRYPTION_WRITE: "on" })
+  const url = encryptField(FIELD.BOOKMARK_URL, "https://example.com/a?b=c")
+  assert.equal(decryptField(FIELD.BOOKMARK_URL, url), "https://example.com/a?b=c")
+  assert.throws(() => decryptField(FIELD.CHECKLIST_TITLE, url), DataCryptoError)
+  assert.equal(decryptField(FIELD.CHECKLIST_TITLE, encryptField(FIELD.CHECKLIST_TITLE, "Beli kopi")), "Beli kopi")
 })

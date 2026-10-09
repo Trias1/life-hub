@@ -309,7 +309,7 @@ export function TaskDetails({ task, state, workspaceId, canDeletePermanently, au
           <form action={actions.createTaskComment} className="mt-4 flex flex-col gap-2">
             {hidden("taskId", task.id)}
             <label htmlFor="task-comment" className="sr-only">Add a comment</label>
-            <textarea id="task-comment" required maxLength={2500} name="body" rows={3} placeholder="Add a comment…" className="field-control resize-y" />
+            <textarea id="task-comment" required maxLength={4000} name="body" rows={3} placeholder="Add a comment…" className="field-control resize-y" />
             <div><button className="button-primary min-h-0 px-3.5 py-2">Comment</button></div>
           </form>
         )}

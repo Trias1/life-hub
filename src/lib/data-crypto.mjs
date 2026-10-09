@@ -10,6 +10,8 @@ export const FIELD = Object.freeze({
   EVENT_DESCRIPTION: "event.description",
   PROFILE_BIO: "profile.bio",
   SPACE_DESCRIPTION: "space.description",
+  BOOKMARK_URL: "bookmark.url",
+  CHECKLIST_TITLE: "task_checklist.title",
 })
 const families = new Set(Object.values(FIELD))
 

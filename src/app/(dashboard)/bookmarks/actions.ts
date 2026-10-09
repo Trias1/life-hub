@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure, validationFailure } from "@/lib/actions/server"
+import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
 import { parseCsv } from "@/lib/csv.mjs"
 
@@ -30,7 +31,7 @@ export async function createBookmark(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/bookmarks/new", "access the active workspace")
 
-  const { data: bookmark, error } = await context.supabase.from("bookmarks").insert({ title: input.data.title, url: input.data.url, collection: input.data.collection, tags: tags(input.data.tags), workspace_id: context.workspaceId, creator_id: context.user.id }).select("id").single()
+  const { data: bookmark, error } = await context.supabase.from("bookmarks").insert({ title: input.data.title, url: encryptField(FIELD.BOOKMARK_URL, input.data.url), collection: input.data.collection, tags: tags(input.data.tags), workspace_id: context.workspaceId, creator_id: context.user.id }).select("id").single()
   if (error) actionFailure("/bookmarks/new", "create bookmark", error)
   await recordActivity(context, { action: "Created", entityType: "bookmark", entityId: bookmark.id })
   revalidatePath("/bookmarks")
@@ -79,7 +80,7 @@ export async function importBookmarks(formData: FormData): Promise<void> {
   }
   const records = rows.map(([title = "", url = "", collection = "General", tagText = ""]) => {
     return schema.safeParse({ title, url, collection, tags: tagText })
-  }).filter((result) => result.success).map((result) => ({ title: result.data.title, url: result.data.url, collection: result.data.collection, tags: tags(result.data.tags.replaceAll("|", ",")), workspace_id: context.workspaceId, creator_id: context.user.id }))
+  }).filter((result) => result.success).map((result) => ({ title: result.data.title, url: encryptField(FIELD.BOOKMARK_URL, result.data.url), collection: result.data.collection, tags: tags(result.data.tags.replaceAll("|", ",")), workspace_id: context.workspaceId, creator_id: context.user.id }))
   if (!records.length) actionFailure("/bookmarks", "import bookmarks")
 
   const { error } = await context.supabase.from("bookmarks").insert(records)
@@ -100,7 +101,7 @@ export async function updateBookmark(formData: FormData): Promise<void> {
   const context = await getWorkspaceContext()
   if (!context) actionFailure(back, "access the active workspace")
 
-  const { error } = await context.supabase.from("bookmarks").update({ title: input.data.title, url: input.data.url, collection: input.data.collection, tags: tags(input.data.tags), updated_at: new Date().toISOString() }).eq("id", input.data.id).eq("workspace_id", context.workspaceId).eq("creator_id", context.user.id)
+  const { error } = await context.supabase.from("bookmarks").update({ title: input.data.title, url: encryptField(FIELD.BOOKMARK_URL, input.data.url), collection: input.data.collection, tags: tags(input.data.tags), updated_at: new Date().toISOString() }).eq("id", input.data.id).eq("workspace_id", context.workspaceId).eq("creator_id", context.user.id)
   if (error) actionFailure(back, "update bookmark", error)
   await recordActivity(context, { action: "Updated", entityType: "bookmark", entityId: input.data.id })
   revalidateBookmark(input.data.id)

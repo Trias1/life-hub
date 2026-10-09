@@ -90,7 +90,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
           members={(members ?? []).map((member) => ({ value: member.user_id, label: member.user_id === context.user.id ? "You" : memberName(member.user_id, context.user.id) }))}
           labels={labels ?? []}
           selectedLabelIds={(assignments ?? []).map((row) => row.label_id)}
-          checklist={checklist ?? []}
+          checklist={(checklist ?? []).map((item) => ({ ...item, title: decryptField(FIELD.CHECKLIST_TITLE, item.title) }))}
           attachments={attachments}
           files={availableFiles ?? []}
           activity={activity}

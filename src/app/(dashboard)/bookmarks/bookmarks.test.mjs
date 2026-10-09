@@ -83,3 +83,15 @@ test("new bookmark form puts the URL first and auto-fills the title", () => {
   assert.ok(composer.indexOf('name="url"') < composer.indexOf('name="title"'), "URL field comes before title");
   assert.match(composer, /\/api\/bookmarks\/fetch-meta\?url=/);
 });
+
+test("bookmark URLs are encrypted at rest and decrypted before display or export", () => {
+  const searchRoute = read("../../api/search/route.ts")
+  const csvExport = read("../../api/bookmarks/export/route.ts")
+  const workspaceExport = read("../../api/workspace/export/route.ts")
+  assert.equal((actions.match(/url: encryptField\(FIELD\.BOOKMARK_URL, (input|result)\.data\.url\)/g) ?? []).length, 3)
+  assert.match(listPage, /decryptField\(FIELD\.BOOKMARK_URL, bookmark\.url\)/)
+  assert.match(detailPage, /decryptField\(FIELD\.BOOKMARK_URL, bookmark\.url\)/)
+  assert.match(searchRoute, /decryptField\(FIELD\.BOOKMARK_URL, bookmark\.url\)/)
+  assert.match(csvExport, /decryptForExport\(FIELD\.BOOKMARK_URL, item\.url\)/)
+  assert.match(workspaceExport, /bookmarks: \[\["url", FIELD\.BOOKMARK_URL\]\]/)
+})
