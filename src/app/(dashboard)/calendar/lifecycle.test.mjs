@@ -65,3 +65,15 @@ test("event descriptions are encrypted at rest", () => {
   assert.equal((actions.match(/description: encryptField\(FIELD\.EVENT_DESCRIPTION, input\.data\.description\)/g) ?? []).length, 2)
   assert.match(detailPage, /decryptField\(FIELD\.EVENT_DESCRIPTION, event\.description\)/)
 })
+
+test("an unreadable Google token cannot take the calendar page down", async () => {
+  const { encryptToken, decryptToken } = await import("../../../lib/token-crypto.mjs")
+  // A token encrypted under a previous key fails to decrypt, which used to throw out of the page.
+  assert.throws(() => decryptToken(encryptToken("refresh-token", "old-key"), "new-key"))
+  assert.match(listPage, /getGoogleCalendarEvents\(context\.user\.id\)/)
+  const auth = read("../../../lib/google-drive-auth.ts")
+  const calendarEvents = auth.slice(auth.indexOf("export async function getGoogleCalendarEvents"))
+  const tryAt = calendarEvents.indexOf("try {")
+  assert.ok(tryAt > 0 && tryAt < calendarEvents.indexOf("decryptToken("), "decryptToken must run inside try")
+  assert.ok(tryAt < calendarEvents.indexOf("createGoogleOAuthClient()"), "OAuth client setup must run inside try")
+})

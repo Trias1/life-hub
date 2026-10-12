@@ -116,11 +116,13 @@ export async function getGoogleCalendarEvents(userId: string, timeMin = new Date
   const { data, error } = await createAdminClient().from("google_oauth_tokens").select("refresh_token,scopes").eq("user_id", userId).maybeSingle()
   if (error || !data?.refresh_token) return []
   if (!data.scopes?.includes("https://www.googleapis.com/auth/calendar.readonly")) return []
-  const auth = createGoogleOAuthClient()
-  auth.setCredentials({ refresh_token: decryptToken(data.refresh_token, tokenSecret()) })
-  const calendar = google.calendar({ version: "v3", auth })
   const timeMax = new Date(timeMin.getTime() + days * 24 * 60 * 60 * 1000)
+  // Google events are optional extras: an unreadable token (e.g. encrypted under a previous key) or
+  // missing OAuth config must not take the whole Calendar page down. Reconnecting Google fixes the token.
   try {
+    const auth = createGoogleOAuthClient()
+    auth.setCredentials({ refresh_token: decryptToken(data.refresh_token, tokenSecret()) })
+    const calendar = google.calendar({ version: "v3", auth })
     const response = await calendar.events.list({ calendarId: "primary", timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: true, orderBy: "startTime", maxResults: 100 })
     return (response.data.items ?? []).flatMap((event) => {
       const start = event.start?.dateTime ?? (event.start?.date ? new Date(event.start.date + "T00:00:00").toISOString() : null)
