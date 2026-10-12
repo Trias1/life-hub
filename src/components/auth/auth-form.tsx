@@ -4,19 +4,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { FormEvent, useState } from "react"
 import { Eye, EyeOff, MailCheck } from "lucide-react"
+import { passwordStrength } from "@/lib/password-strength"
 import { createClient } from "@/lib/supabase/client"
 
 type AuthMode = "login" | "register"
-
-/** Rough strength hint for new passwords: length plus character variety. */
-function passwordStrength(value: string) {
-  let score = 0
-  if (value.length >= 8) score++
-  if (value.length >= 12) score++
-  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score++
-  if (/\d/.test(value) && /[^A-Za-z0-9]/.test(value)) score++
-  return [{ label: "Too short", tone: "weak" }, { label: "Weak", tone: "weak" }, { label: "Fair", tone: "fair" }, { label: "Good", tone: "good" }, { label: "Strong", tone: "good" }][value.length < 8 ? 0 : score]
-}
 
 function friendlyError(message: string) {
   if (/invalid login credentials/i.test(message)) return "That email and password don't match. Check them and try again."
@@ -85,12 +76,12 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           {mode === "login" && <Link href="/forgot-password" className="text-xs font-medium text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline">Forgot password?</Link>}
         </div>
         <div className="relative">
-          <input id="auth-password" type={showPassword ? "text" : "password"} name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "At least 8 characters" : ""} aria-describedby={strength ? "auth-strength" : undefined} className="field-control w-full pr-10" />
-          <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--muted)] hover:text-[var(--foreground)]" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+          <input id="auth-password" type={showPassword ? "text" : "password"} name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "At least 8 characters" : ""} aria-invalid={error ? true : undefined} aria-describedby={[strength && "auth-strength", error && "auth-error"].filter(Boolean).join(" ") || undefined} className="field-control w-full pr-12" />
+          <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-0.5 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded text-[var(--muted)] hover:text-[var(--foreground)]" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
         </div>
         {strength && <p id="auth-strength" className="auth-strength" data-tone={strength.tone}><span aria-hidden /> {strength.label}</p>}
       </div>
-      {error && <p role="alert" className="auth-alert" data-tone="error">{error}</p>}
+      {error && <p id="auth-error" role="alert" className="auth-alert" data-tone="error">{error}</p>}
       <button disabled={loading} className="button-primary w-full disabled:opacity-60">{loading ? (mode === "login" ? "Signing in…" : "Creating account…") : mode === "login" ? "Sign in" : "Create account"}</button>
     </form>
   )

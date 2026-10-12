@@ -11,6 +11,8 @@
   --accent: #f4f4f5;
   --accent-hover: #d4d4d8;
   --on-accent: #0a0a0a;
+  --danger: #fda4af;
+  --success: #6ee7b7;
   --radius-card: 1rem;
   --radius-control: 0.7rem;
   --space-page: 2rem;
@@ -20,6 +22,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -448,13 +452,15 @@ html[data-theme="light"] {
   color-scheme: light;
   --background: #f7f8fa;
   --foreground: #17191f;
-  --muted: #69707d;
+  --muted: #5f6672;
   --line: #e5e7eb;
   --surface: #ffffff;
   --surface-muted: #f1f3f5;
   --accent: #17191f;
   --accent-hover: #343942;
   --on-accent: #ffffff;
+  --danger: #be123c;
+  --success: #047857;
 }
 
 html[data-density="compact"] .page-container {
@@ -646,7 +652,7 @@ html[data-widget-storage="false"] [data-dashboard-widget="storage"] {
   border: 0;
   border-radius: 9999px;
   background-color: var(--accent);
-  color: white;
+  color: var(--on-accent);
   font-size: 1.6rem;
   font-weight: 700;
 }

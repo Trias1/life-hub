@@ -106,7 +106,8 @@ export async function deleteWorkspace(formData: FormData): Promise<void> {
 }
 export async function disconnectGoogleDrive(): Promise<void> {
   const context = await getWorkspaceContext()
-  if (!context || !["admin", "super_admin"].includes(context.role)) actionFailure("/settings", "disconnect Google Drive")
+  // Owner only: the connection decides whose Google account holds every workspace file.
+  if (!context || context.role !== "super_admin") actionFailure("/settings", "disconnect Google Drive")
   try {
     await disconnectWorkspaceDriveConnection(context.workspaceId)
   } catch (error) {

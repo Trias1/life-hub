@@ -89,7 +89,7 @@ export function FileDetail({ file, typeLabel, size, downloadUrl, imagePreviewUrl
             {canEdit && (
               <span className="flex flex-wrap gap-2">
                 <form action={actions.restoreFile}>{hidden("id", file.id)}<PendingButton pendingText="Restoring…" className="button-secondary min-h-0 px-3 py-1.5 text-xs"><RotateCcw size={13} className="mr-1.5" />Restore</PendingButton></form>
-                <form action={actions.permanentlyDeleteFile} onSubmit={(event) => { if (!window.confirm("Delete \"" + file.name + "\" permanently? It is also removed from Google Drive. This cannot be undone.")) event.preventDefault() }}>{hidden("id", file.id)}<PendingButton pendingText="Deleting…" className="button-quiet min-h-0 px-3 py-1.5 text-xs text-red-600">Delete permanently</PendingButton></form>
+                <form action={actions.permanentlyDeleteFile} onSubmit={(event) => { if (!window.confirm("Delete \"" + file.name + "\" permanently? It is also removed from Google Drive. This cannot be undone.")) event.preventDefault() }}>{hidden("id", file.id)}<PendingButton pendingText="Deleting…" className="button-quiet min-h-0 px-3 py-1.5 text-xs text-danger">Delete permanently</PendingButton></form>
               </span>
             )}
           </div>
@@ -106,7 +106,7 @@ export function FileDetail({ file, typeLabel, size, downloadUrl, imagePreviewUrl
                   <button type="button" role="menuitem" onClick={() => void copy("/files/" + file.id, "Link copied")}><Copy size={14} />Copy link</button>
                   {canEdit && !file.trashed && <>
                     <form action={actions.toggleFavorite} onSubmit={() => setMenuOpen(false)}>{hidden("id", file.id)}{hidden("favorite", file.isFavorite ? "false" : "true")}<button role="menuitem">{file.isFavorite ? <StarOff size={14} /> : <Star size={14} />}{file.isFavorite ? "Remove from favourites" : "Add to favourites"}</button></form>
-                    <form action={actions.trashFile} onSubmit={() => setMenuOpen(false)}>{hidden("id", file.id)}<button role="menuitem" className="text-red-600"><Trash2 size={14} />Move to trash</button></form>
+                    <form action={actions.trashFile} onSubmit={() => setMenuOpen(false)}>{hidden("id", file.id)}<button role="menuitem" className="text-danger"><Trash2 size={14} />Move to trash</button></form>
                   </>}
                 </div>
               )}
@@ -179,7 +179,7 @@ export function FileDetail({ file, typeLabel, size, downloadUrl, imagePreviewUrl
             <label htmlFor="version-file" className="sr-only">New version</label>
             <input id="version-file" required name="version" type="file" accept={UPLOAD_ACCEPT} onChange={checkVersion} className="field-control min-h-0 min-w-0 max-w-full flex-1 py-1.5 text-xs sm:max-w-sm" />
             <PendingButton disabled={Boolean(versionProblem)} pendingText="Uploading…" className="button-secondary min-h-0 px-3 py-1.5 text-xs">Upload new version</PendingButton>
-            {versionProblem && <p role="alert" className="w-full text-xs text-red-600">{versionProblem}</p>}
+            {versionProblem && <p role="alert" className="w-full text-xs text-danger">{versionProblem}</p>}
           </form>
         )}
         <ol className="issue-timeline">

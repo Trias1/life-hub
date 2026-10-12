@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (!code || !state || !savedState || state !== savedState) return NextResponse.redirect(new URL("/settings?error=Invalid+Google+OAuth+state", request.url))
   const workspaceId = state.split(":")[1]
   const context = await getWorkspaceContext()
-  if (!context || context.workspaceId !== workspaceId || !["admin", "super_admin"].includes(context.role)) return NextResponse.redirect(new URL("/settings?error=Workspace+connection+was+not+authorized", request.url))
+  if (!context || context.workspaceId !== workspaceId || context.role !== "super_admin") return NextResponse.redirect(new URL("/settings?error=Workspace+connection+was+not+authorized", request.url))
 
   try {
     const client = createGoogleOAuthClient(new URL("/api/auth/google/callback", request.url).toString())

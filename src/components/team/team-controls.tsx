@@ -47,7 +47,7 @@ export function MemberControls({ userId, shortId, role, canChangeRole, changeMem
       <RowMenu label={"Actions for member " + shortId} item={(close) => (
         <form action={removeMember} onSubmit={(event) => { if (!window.confirm("Remove member " + shortId + " from this workspace? They lose access immediately.")) event.preventDefault(); else close() }}>
           <input type="hidden" name="id" value={userId} />
-          <button role="menuitem" className="text-red-600" aria-label={"Remove member " + shortId}><UserMinus size={14} />Remove member</button>
+          <button role="menuitem" className="text-danger" aria-label={"Remove member " + shortId}><UserMinus size={14} />Remove member</button>
         </form>
       )} />
     </div>
@@ -60,7 +60,7 @@ export function InvitationMenu({ id, email, revokeInvitation }: { id: string; em
     <RowMenu label={"Actions for invitation to " + email} item={(close) => (
       <form action={revokeInvitation} onSubmit={(event) => { if (!window.confirm("Revoke the invitation for " + email + "? The link stops working.")) event.preventDefault(); else close() }}>
         <input type="hidden" name="id" value={id} />
-        <button role="menuitem" className="text-red-600" aria-label={"Revoke invitation for " + email}><Trash2 size={14} />Revoke invitation</button>
+        <button role="menuitem" className="text-danger" aria-label={"Revoke invitation for " + email}><Trash2 size={14} />Revoke invitation</button>
       </form>
     )} />
   )

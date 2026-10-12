@@ -188,7 +188,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                   </div>
                   <p className="issue-row-meta">
                     {statusLabel(task.status)} · created {relativeTime(task.created_at, now)} by {task.created_by ? memberName(task.created_by, context.user.id) : "a former member"}
-                    {task.due_date && <> · <span className={overdue ? "font-semibold text-red-600" : ""}>{overdue ? "Overdue · " : "Due "}{dueText(task.due_date)}</span></>}
+                    {task.due_date && <> · <span className={overdue ? "font-semibold text-danger" : ""}>{overdue ? "Overdue · " : "Due "}{dueText(task.due_date)}</span></>}
                     {items.length > 0 && <> · {items.filter((item) => item.is_completed).length}/{items.length} checklist</>}
                   </p>
                 </div>

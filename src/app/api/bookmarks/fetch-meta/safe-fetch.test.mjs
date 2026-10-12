@@ -70,5 +70,5 @@ test('route authenticates before fetching and preserves response shape', () => {
   const route = readFileSync(new URL('./route.ts', import.meta.url), 'utf8')
   assert.match(route, /if \(!context\).*status: 401/)
   assert.ok(route.indexOf('await getWorkspaceContext()') < route.indexOf('await fetchPublicHtml('))
-  assert.match(route, /json\(\{ title, description \}\)/)
+  assert.match(route, /json\(\{ title: title\.slice\(0, 300\), description: description\.slice\(0, 500\) \}\)/)
 })

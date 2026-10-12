@@ -109,7 +109,7 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
             {canEdit && (
               <span className="flex gap-2">
                 <form action={actions.restoreNote}>{hidden("id", note.id)}{hidden("from", state)}<button className="button-secondary min-h-0 px-3 py-1.5 text-xs"><RotateCcw size={13} className="mr-1.5" />Restore</button></form>
-                {state === "trash" && <form action={actions.deleteNotePermanently} onSubmit={(event) => { if (!window.confirm("Delete this note permanently? This cannot be undone.")) event.preventDefault() }}>{hidden("id", note.id)}<button className="button-quiet min-h-0 px-3 py-1.5 text-xs text-red-600">Delete permanently</button></form>}
+                {state === "trash" && <form action={actions.deleteNotePermanently} onSubmit={(event) => { if (!window.confirm("Delete this note permanently? This cannot be undone.")) event.preventDefault() }}>{hidden("id", note.id)}<button className="button-quiet min-h-0 px-3 py-1.5 text-xs text-danger">Delete permanently</button></form>}
               </span>
             )}
           </div>
@@ -145,7 +145,7 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
                       {canEdit && state === "active" && <>
                         <form action={actions.toggleFavorite} onSubmit={() => setMenuOpen(false)}>{hidden("id", note.id)}{hidden("favorite", note.is_favorite ? "false" : "true")}<button role="menuitem">{note.is_favorite ? <PinOff size={14} /> : <Pin size={14} />}{note.is_favorite ? "Unpin" : "Pin to top"}</button></form>
                         <form action={actions.archiveNote}>{hidden("id", note.id)}<button role="menuitem"><Archive size={14} />Archive</button></form>
-                        <form action={actions.trashNote}>{hidden("id", note.id)}<button role="menuitem" className="text-red-600"><Trash2 size={14} />Move to trash</button></form>
+                        <form action={actions.trashNote}>{hidden("id", note.id)}<button role="menuitem" className="text-danger"><Trash2 size={14} />Move to trash</button></form>
                       </>}
                     </div>
                   )}

@@ -415,7 +415,7 @@ export function Sidebar({
                 Keyboard Shortcuts
               </button>
               <form action={signOut} className="mt-1 border-t border-[var(--line)] pt-1">
-                <button className="sidebar-menu-item w-full text-red-400">
+                <button className="sidebar-menu-item w-full text-danger">
                   Logout
                 </button>
               </form>

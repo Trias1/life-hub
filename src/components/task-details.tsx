@@ -114,7 +114,7 @@ export function TaskDetails({ task, state, workspaceId, canDeletePermanently, au
             <span>This task is in the trash.</span>
             <span className="flex flex-wrap gap-2">
               <form action={actions.restoreTask}>{hidden("taskId", task.id)}<button className="button-secondary min-h-0 px-3 py-1.5 text-xs"><RotateCcw size={13} className="mr-1.5" />Restore</button></form>
-              {canDeletePermanently && <form action={actions.deleteTaskPermanently} onSubmit={(event) => { if (!window.confirm("Delete this task permanently? Its checklist, comments, and attachments go with it. This cannot be undone.")) event.preventDefault() }}>{hidden("taskId", task.id)}<button className="button-quiet min-h-0 px-3 py-1.5 text-xs text-red-600">Delete permanently</button></form>}
+              {canDeletePermanently && <form action={actions.deleteTaskPermanently} onSubmit={(event) => { if (!window.confirm("Delete this task permanently? Its checklist, comments, and attachments go with it. This cannot be undone.")) event.preventDefault() }}>{hidden("taskId", task.id)}<button className="button-quiet min-h-0 px-3 py-1.5 text-xs text-danger">Delete permanently</button></form>}
             </span>
           </div>
         )}
@@ -151,7 +151,7 @@ export function TaskDetails({ task, state, workspaceId, canDeletePermanently, au
                           ? <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); run(actions.updateTaskStatus, { id: task.id, status: "done" }) }}><CircleCheck size={14} />Mark as done</button>
                           : <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); run(actions.updateTaskStatus, { id: task.id, status: "todo" }) }}><CircleDot size={14} />Reopen task</button>}
                         {task.status !== "cancelled" && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); run(actions.updateTaskStatus, { id: task.id, status: "cancelled" }) }}><CircleSlash size={14} />Cancel task</button>}
-                        <form action={actions.trashTask} onSubmit={() => setMenuOpen(false)}>{hidden("taskId", task.id)}<button role="menuitem" className="text-red-600" aria-label={`Move ${task.title} to trash`}><Trash2 size={14} />Move to trash</button></form>
+                        <form action={actions.trashTask} onSubmit={() => setMenuOpen(false)}>{hidden("taskId", task.id)}<button role="menuitem" className="text-danger" aria-label={`Move ${task.title} to trash`}><Trash2 size={14} />Move to trash</button></form>
                       </>}
                     </div>
                   )}
@@ -209,7 +209,7 @@ export function TaskDetails({ task, state, workspaceId, canDeletePermanently, au
                 <li key={attachment.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                   <a href={"/api/files/" + attachment.file.id + "/download"} target="_blank" rel="noopener" className="min-w-0 flex-1 truncate font-medium hover:underline">{attachment.file.name}</a>
                   <span className="shrink-0 text-xs text-[var(--muted)]">{formatBytes(Number(attachment.file.size_bytes))}</span>
-                  {active && <form action={actions.detachTaskFile}>{hidden("taskId", task.id)}{hidden("fileId", attachment.file.id)}<button className="text-xs text-[var(--muted)] hover:text-red-600" aria-label={"Remove " + attachment.file.name}>Remove</button></form>}
+                  {active && <form action={actions.detachTaskFile}>{hidden("taskId", task.id)}{hidden("fileId", attachment.file.id)}<button className="text-xs text-[var(--muted)] hover:text-danger" aria-label={"Remove " + attachment.file.name}>Remove</button></form>}
                 </li>
               ))}
             </ul>
@@ -250,7 +250,7 @@ export function TaskDetails({ task, state, workspaceId, canDeletePermanently, au
               <input name="dueDate" type="date" aria-label="Due date" defaultValue={task.dueDate ?? ""} className="field-control min-h-0 py-1.5 text-sm" />
               <span className="flex gap-2"><button className="button-secondary min-h-0 px-2.5 py-1 text-xs">Save</button>{task.dueDate && <button type="button" onClick={() => { setEditingField(""); run(actions.updateTask, editFields({ dueDate: "" })) }} className="button-quiet min-h-0 px-2.5 py-1 text-xs">Remove</button>}</span>
             </form>
-          ) : <p className={"mt-1.5 text-sm" + (due?.overdue ? " font-semibold text-red-600" : due ? "" : " text-[var(--muted)]")}>{due ? (due.overdue ? "Overdue · " : "") + due.label : "None"}</p>}
+          ) : <p className={"mt-1.5 text-sm" + (due?.overdue ? " font-semibold text-danger" : due ? "" : " text-[var(--muted)]")}>{due ? (due.overdue ? "Overdue · " : "") + due.label : "None"}</p>}
         </div>
         <div className="issue-sidebar-block max-lg:col-span-2">
           <div className="flex items-center justify-between gap-2"><p className="issue-sidebar-label">Labels</p>{editToggle("labels")}</div>

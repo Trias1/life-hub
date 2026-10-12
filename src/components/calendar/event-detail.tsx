@@ -99,7 +99,7 @@ export function EventDetail({ event, state, canEdit, creatorName, createdAt, cre
                       {canEdit && (
                         <form action={actions.deleteEvent} onSubmit={(submit) => { if (!window.confirm(event.recurrence_rule ? "Delete this event and every occurrence in the series? This cannot be undone." : "Delete this event? This cannot be undone.")) submit.preventDefault() }}>
                           {hidden("id", event.id)}
-                          <button role="menuitem" className="text-red-600"><Trash2 size={14} />{event.recurrence_rule ? "Delete event series" : "Delete event"}</button>
+                          <button role="menuitem" className="text-danger"><Trash2 size={14} />{event.recurrence_rule ? "Delete event series" : "Delete event"}</button>
                         </form>
                       )}
                     </div>

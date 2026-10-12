@@ -24,7 +24,7 @@ export function FileUploadForm({ action, folders }: { action: (formData: FormDat
         <label htmlFor="upload-file" className="issue-form-label">File <span className="font-normal text-[var(--muted)]">(required)</span></label>
         <input id="upload-file" required name="file" type="file" accept={UPLOAD_ACCEPT} onChange={check} aria-describedby="upload-file-hint" className="field-control min-w-0 max-w-full text-sm" />
         <p id="upload-file-hint" className="text-xs text-[var(--muted)]">Images, PDF, documents, ZIP, audio, or video · max {formatBytes(UPLOAD_MAX_BYTES)}</p>
-        {problem && <p role="alert" className="text-xs text-red-600">{problem}</p>}
+        {problem && <p role="alert" className="text-xs text-danger">{problem}</p>}
       </div>
       <div className="issue-form-field issue-form-narrow">
         <label htmlFor="upload-folder" className="issue-form-label">Folder</label>

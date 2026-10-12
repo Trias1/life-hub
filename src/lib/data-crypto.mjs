@@ -100,3 +100,10 @@ export function decryptForExport(family, stored) {
     throw error
   }
 }
+
+/**
+ * For read-only lists (bookmark list, search, comments, checklist rows): one forged or unreadable row
+ * must not take the whole page down for every member. Single-item edit pages keep using decryptField.
+ * @param {string} family @param {string | null | undefined} stored
+ */
+export const decryptForList = decryptForExport

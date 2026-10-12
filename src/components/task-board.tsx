@@ -63,7 +63,7 @@ export function TaskBoard({ tasks, action }: { tasks: BoardTask[]; action: TaskA
                     {task.labels.map((item) => <LabelChip key={item.id} name={item.name} color={item.color} />)}
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--muted)]">
-                    <span className={task.overdue ? "font-semibold text-red-600" : ""}>{task.dueLabel ? (task.overdue ? "Overdue · " : "Due ") + task.dueLabel : "No due date"}</span>
+                    <span className={task.overdue ? "font-semibold text-danger" : ""}>{task.dueLabel ? (task.overdue ? "Overdue · " : "Due ") + task.dueLabel : "No due date"}</span>
                     {task.assigneeName && <AssigneeBadge name={task.assigneeName} />}
                   </div>
                   <label className="sr-only" htmlFor={"board-status-" + task.id}>Status for {task.title}</label>

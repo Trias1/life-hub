@@ -6,7 +6,7 @@ import { memberName, statusLabel, todayKey, isOpenStatus, type TaskStatus } from
 import { formatDate, formatDateTime } from "@/lib/format-date"
 import { relativeTime } from "@/lib/relative-time"
 import { getWorkspaceContext } from "@/lib/workspace/server"
-import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
+import { FIELD, decryptField, decryptForList } from "@/lib/data-crypto.mjs"
 import {
   assignTask, attachTaskFile, createChecklistItem, createTaskComment, createTaskLabel, deleteTaskPermanently, detachTaskFile,
   restoreTask, toggleChecklistItem, toggleTaskLabel, trashTask, updateTask, updateTaskStatus,
@@ -63,7 +63,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
   // Comments are shown in full, so their "Commented on" log entries would only repeat them.
   const activity: TaskActivityItem[] = [
     ...(timeline ?? []).filter((item) => item.action !== "Commented on").map((item) => ({ kind: "event" as const, id: item.id, author: nameOf(item.actor_id), text: describe(item.action), sortKey: item.created_at, ...stamp(item.created_at) })),
-    ...(comments ?? []).map((comment) => ({ kind: "comment" as const, id: comment.id, author: nameOf(comment.author_id), text: decryptField(FIELD.TASK_COMMENT_BODY, comment.body), sortKey: comment.created_at, ...stamp(comment.created_at) })),
+    ...(comments ?? []).map((comment) => ({ kind: "comment" as const, id: comment.id, author: nameOf(comment.author_id), text: decryptForList(FIELD.TASK_COMMENT_BODY, comment.body), sortKey: comment.created_at, ...stamp(comment.created_at) })),
   ].sort((a, b) => a.sortKey.localeCompare(b.sortKey))
   const state = task.deleted_at ? "trash" : isOpenStatus(task.status) ? "open" : "closed"
   const backHref = state === "trash" ? "/tasks?view=trash" : state === "closed" ? "/tasks?view=closed" : "/tasks"
@@ -90,7 +90,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
           members={(members ?? []).map((member) => ({ value: member.user_id, label: member.user_id === context.user.id ? "You" : memberName(member.user_id, context.user.id) }))}
           labels={labels ?? []}
           selectedLabelIds={(assignments ?? []).map((row) => row.label_id)}
-          checklist={(checklist ?? []).map((item) => ({ ...item, title: decryptField(FIELD.CHECKLIST_TITLE, item.title) }))}
+          checklist={(checklist ?? []).map((item) => ({ ...item, title: decryptForList(FIELD.CHECKLIST_TITLE, item.title) }))}
           attachments={attachments}
           files={availableFiles ?? []}
           activity={activity}

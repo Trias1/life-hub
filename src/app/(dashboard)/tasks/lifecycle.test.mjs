@@ -67,12 +67,12 @@ test("task description and comments are encrypted at rest", () => {
   assert.match(actions, /const body = encryptField\(FIELD\.TASK_COMMENT_BODY, input\.data\.body\)/)
   assert.match(actions, /if \(body\.length > 12000\) actionFailure\(back, "add task comment"\)/)
   assert.match(detailPage, /decryptField\(FIELD\.TASK_DESCRIPTION, task\.description\)/)
-  assert.match(detailPage, /decryptField\(FIELD\.TASK_COMMENT_BODY, comment\.body\)/)
+  assert.match(detailPage, /decryptForList\(FIELD\.TASK_COMMENT_BODY, comment\.body\)/)
   assert.match(detail, /maxLength=\{4000\} name="body"/)
 })
 
 test("checklist item titles are encrypted at rest", () => {
   assert.match(actions, /const title = encryptField\(FIELD\.CHECKLIST_TITLE, input\.data\.title\)/)
   assert.match(actions, /if \(title\.length > 2000\) actionFailure\(back, "create checklist item"\)/)
-  assert.match(detailPage, /decryptField\(FIELD\.CHECKLIST_TITLE, item\.title\)/)
+  assert.match(detailPage, /decryptForList\(FIELD\.CHECKLIST_TITLE, item\.title\)/)
 })

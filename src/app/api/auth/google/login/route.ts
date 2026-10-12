@@ -8,7 +8,7 @@ export const runtime = "nodejs"
 export async function GET(request: NextRequest) {
   const context = await getWorkspaceContext()
   if (!context) return NextResponse.redirect(new URL("/settings?error=Sign+in+to+connect+Google+Drive", request.url))
-  if (!["admin", "super_admin"].includes(context.role)) return NextResponse.redirect(new URL("/settings?error=Only+workspace+admins+can+connect+Google+Drive", request.url))
+  if (context.role !== "super_admin") return NextResponse.redirect(new URL("/settings?error=Only+the+workspace+owner+can+connect+Google+Drive", request.url))
   try {
     const state = crypto.randomUUID() + ":" + context.workspaceId
     const callbackUrl = new URL("/api/auth/google/callback", request.url).toString()

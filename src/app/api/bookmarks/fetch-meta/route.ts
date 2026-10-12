@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 })
   }
-  if (!['http:', 'https:'].includes(url.protocol)) {
+  // Default ports only, so the endpoint can't be used to probe arbitrary services from our servers.
+  if (!['http:', 'https:'].includes(url.protocol) || (url.port && !['80', '443'].includes(url.port))) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 })
   }
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
       html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
       html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1] ||
       ""
-    return NextResponse.json({ title, description })
+    return NextResponse.json({ title: title.slice(0, 300), description: description.slice(0, 500) })
   } catch {
     return NextResponse.json({ error: "Failed to fetch" }, { status: 422 })
   }

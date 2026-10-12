@@ -70,7 +70,7 @@ export function ProfileStudio({
           />
         </label>
         <button className="button-secondary">Upload photo</button>
-        <p className="text-xs text-zinc-500">PNG, JPEG, or WebP ? max 2 MB</p>
+        <p className="text-xs text-zinc-500">PNG, JPEG, or WebP · max 2 MB</p>
       </form>
       <form action={updateProfile} className="grid gap-5 sm:grid-cols-2">
         <input type="hidden" name="returnPath" value="/profile" />
@@ -150,7 +150,7 @@ export function ProfileStudio({
         <div>
           <p className="font-semibold">Current browser</p>
           <p className="mt-1 text-sm text-zinc-500">
-            This signed-in session ? {email}
+            This signed-in session · {email}
           </p>
         </div>
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-600">
@@ -231,7 +231,7 @@ export function ProfileStudio({
           <div className="min-w-0 flex-1">
             <p className="text-2xl font-semibold tracking-tight">{name}</p>
             <p className="mt-1 text-sm text-zinc-500">
-              @{profile?.username || "username"} ? Sanctum Cove workspace
+              @{profile?.username || "username"} · Sanctum Cove workspace
             </p>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
               {profile?.bio ||

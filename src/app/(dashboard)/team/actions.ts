@@ -29,6 +29,18 @@ export async function inviteMember(formData: FormData): Promise<void> {
   if (!context) actionFailure("/team/invite", "create invitation")
   if (input.data.role === "admin" && context.role !== "super_admin") actionFailure("/team/invite", "create admin invitation")
 
+  // Every invitation can send an email from our sender: cap it per inviter and skip duplicates,
+  // so a throwaway workspace can't be used to mail-bomb people or get the sender suspended.
+  const email = input.data.email.toLowerCase()
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const [{ count: sentToday, error: countError }, { data: pending, error: pendingError }] = await Promise.all([
+    context.supabase.from("workspace_invitations").select("id", { count: "exact", head: true }).eq("created_by", context.user.id).gte("created_at", since),
+    context.supabase.from("workspace_invitations").select("id").eq("workspace_id", context.workspaceId).eq("email", email).is("accepted_at", null).is("declined_at", null).gt("expires_at", new Date().toISOString()).limit(1),
+  ])
+  if (countError || pendingError) actionFailure("/team/invite", "create invitation", countError ?? pendingError)
+  if ((sentToday ?? 0) >= 20) redirect("/team/invite?error=" + encodeURIComponent("Invitation limit reached (20 per day). Try again tomorrow."))
+  if (pending?.length) redirect("/team?tab=invitations&error=" + encodeURIComponent("This email already has a pending invitation."))
+
   const token = randomUUID()
   const { error } = await context.supabase.from("workspace_invitations").insert({ workspace_id: context.workspaceId, email: input.data.email.toLowerCase(), role: input.data.role, token_hash: createHash("sha256").update(token).digest("hex"), created_by: context.user.id })
   if (error) actionFailure("/team/invite", "create invitation", error)
