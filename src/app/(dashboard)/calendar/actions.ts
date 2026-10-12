@@ -8,7 +8,7 @@ import { createNotification, getWorkspaceContext, recordActivity } from "@/lib/w
 import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 
 // DateTimePicker submits "YYYY-MM-DDTHH:mm" with no zone: read it as Jakarta wall time, whatever zone the server runs in.
-const jakartaDate = z.preprocess((value) => typeof value === "string" && /^d{4}-d{2}-d{2}Td{2}:d{2}(:d{2})?$/.test(value) ? value + "+07:00" : value, z.coerce.date())
+const jakartaDate = z.preprocess((value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value) ? value + "+07:00" : value, z.coerce.date())
 
 const eventSchema = z.object({
   title: z.string().trim().min(1).max(160),
