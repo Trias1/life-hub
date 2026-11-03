@@ -51,6 +51,9 @@
     "overrides": {
         "@next/eslint-plugin-next": {
             "fast-glob": "npm:tinyglobby@0.2.17"
+        },
+        "rimraf": {
+            "glob": "^14.0.2"
         }
     }
 }
