@@ -54,5 +54,5 @@ test("members page keeps the owner, self and super admin protections", () => {
 test("invite form offers admin only to super admins and is admin-only", () => {
   assert.match(invitePage, /isSuperAdmin \? \[\{ value: "admin"/);
   assert.match(invitePage, /\{isAdmin \? \(/);
-  assert.match(controls, /window\.confirm\("Remove member/);
+  assert.match(controls, /window\.confirm\("Remove " \+ label \+ " from this workspace\?/);
 });

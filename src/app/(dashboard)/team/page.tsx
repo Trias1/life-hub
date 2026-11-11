@@ -3,7 +3,7 @@ import { Mail, Search } from "lucide-react"
 import { Select } from "@/components/ui/select"
 import { InvitationLinkNotice, InvitationMenu, MemberControls } from "@/components/team/team-controls"
 import { relativeTime } from "@/lib/relative-time"
-import { getWorkspaceContext } from "@/lib/workspace/server"
+import { getMemberProfiles, getWorkspaceContext } from "@/lib/workspace/server"
 import { changeMemberRole, removeMember, revokeInvitation } from "./actions"
 
 type Member = { user_id: string; role: string; created_at: string }
@@ -49,6 +49,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     : { data: [] }
 
   const members = (memberData ?? []) as Member[]
+  const profiles = await getMemberProfiles(context, members.map((member) => member.user_id))
   const invitations = (invitationData ?? []) as Invitation[]
   // Old links used ?status=pending for the invitation list.
   const requestedTab = params.tab ?? (params.status === "pending" ? "invitations" : "members")
@@ -63,7 +64,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const matchesRole = (value: string) => role === "all" || value === role
 
   const visibleMembers = members
-    .filter((member) => matchesRole(member.role) && (!query || member.user_id.toLowerCase().includes(query)))
+    .filter((member) => matchesRole(member.role) && (!query || [member.user_id, profiles.get(member.user_id)?.name, profiles.get(member.user_id)?.email].some((value) => value?.toLowerCase().includes(query))))
     .sort((a, b) => sort === "recent" ? b.created_at.localeCompare(a.created_at) : sort === "role" ? (roleRank[a.role] ?? 9) - (roleRank[b.role] ?? 9) || a.created_at.localeCompare(b.created_at) : a.created_at.localeCompare(b.created_at))
   const visibleInvitations = invitations.filter((invitation) => (stateFilter === "all" || invitationState(invitation, now) === stateFilter) && matchesRole(invitation.role) && (!query || invitation.email.toLowerCase().includes(query)))
   const pendingCount = invitations.filter((invitation) => invitationState(invitation, now) === "pending").length
@@ -106,7 +107,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <label className="issue-search">
           <Search size={15} aria-hidden />
           <span className="sr-only">{tab === "members" ? "Search members by ID" : "Search invitations by email"}</span>
-          <input name="q" defaultValue={q} placeholder={tab === "members" ? "Search by member ID…" : "Search by email…"} />
+          <input name="q" defaultValue={q} placeholder={tab === "members" ? "Search by name or email…" : "Search by email…"} />
         </label>
         <Select id="team-role-filter" name="role" defaultValue={role} className="field-control issue-filter-select" options={[{ value: "all", label: "All roles" }, { value: "user", label: "Users" }, { value: "admin", label: "Admins" }, { value: "super_admin", label: "Super admins" }]} />
         {tab === "members"
@@ -130,20 +131,25 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             const isOwner = member.user_id === workspace?.owner_id
             const isProtected = isCurrentUser || isOwner || member.role === "super_admin"
             const canManageMember = Boolean(workspace?.owner_id) && isAdmin && !isProtected && (isSuperAdmin || member.role === "user")
+            const profile = profiles.get(member.user_id)
+            const name = profile?.name ?? "Member " + shortId
             return (
               <li key={member.user_id} className="issue-row flex-wrap items-center sm:flex-nowrap">
-                <span aria-hidden className="grid size-8 shrink-0 place-items-center self-start rounded-full bg-[var(--surface-muted)] text-sm font-bold uppercase text-[var(--foreground)] sm:self-center">{member.user_id.slice(0, 1)}</span>
+                {profile?.avatarUrl
+                  // eslint-disable-next-line @next/next/no-img-element -- served by our own authenticated route, not optimisable by next/image
+                  ? <img src={profile.avatarUrl} alt="" width={32} height={32} loading="lazy" className="size-8 shrink-0 self-start rounded-full object-cover sm:self-center" />
+                  : <span aria-hidden className="grid size-8 shrink-0 place-items-center self-start rounded-full bg-[var(--surface-muted)] text-sm font-bold uppercase text-[var(--foreground)] sm:self-center">{name.slice(0, 1)}</span>}
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-sm font-semibold text-[var(--foreground)]">Member {shortId}</span>
+                    <span className="text-sm font-semibold text-[var(--foreground)]">{name}</span>
                     {isCurrentUser && <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold text-[var(--muted)]">You</span>}
                     {isOwner && <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold text-[var(--muted)]">Owner</span>}
                   </p>
-                  <p className="issue-row-meta">Active · Joined <time dateTime={member.created_at} title={member.created_at}>{joinedFormat.format(new Date(member.created_at))}</time></p>
+                  <p className="issue-row-meta">{profile?.email ? profile.email + " · " : ""}Joined <time dateTime={member.created_at} title={member.created_at}>{joinedFormat.format(new Date(member.created_at))}</time></p>
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 pl-11 sm:w-auto sm:shrink-0 sm:justify-end sm:pl-0">
                   {!(canManageMember && isSuperAdmin) && <RoleBadge role={member.role} />}
-                  {canManageMember && <MemberControls userId={member.user_id} shortId={shortId} role={member.role} canChangeRole={isSuperAdmin} changeMemberRole={changeMemberRole} removeMember={removeMember} />}
+                  {canManageMember && <MemberControls userId={member.user_id} label={name} role={member.role} canChangeRole={isSuperAdmin} changeMemberRole={changeMemberRole} removeMember={removeMember} />}
                 </div>
               </li>
             )
@@ -152,7 +158,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       ) : (
         <div className="issue-empty">
           <h2>{filtered ? "No members match these filters" : "No members yet"}</h2>
-          <p>{filtered ? "Try a different member ID or role." : "Invite people to start working together in this workspace."}</p>
+          <p>{filtered ? "Try a different name, email or role." : "Invite people to start working together in this workspace."}</p>
         </div>
       ))}
 

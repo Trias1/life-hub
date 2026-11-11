@@ -1,7 +1,8 @@
 export function apiBucket(pathname) {
   const path = pathname.replace(/\/+$/, "")
-  if (path === "/api/search") return "search"
-  if (["/api/notes/upload-image", "/api/profile/avatar"].includes(path)) return "upload"
+  // Profile photos are read-only GETs, several per page (sidebar, Team list): give them the 60/min read budget.
+  if (path === "/api/search" || path === "/api/profile/avatar") return "search"
+  if (path === "/api/notes/upload-image") return "upload"
   if (["/api/workspace/export", "/api/bookmarks/export"].includes(path)) return "export"
   if (path === "/api/bookmarks/fetch-meta") return "fetch-meta"
   if (path === "/api/auth/google/login" || path === "/api/auth/google/callback" || path === "/api/auth/google/account/login" || path === "/api/auth/google/account/callback") return "oauth"

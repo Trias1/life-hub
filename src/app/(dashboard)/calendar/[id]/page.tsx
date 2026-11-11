@@ -6,7 +6,7 @@ import { dayKey, eventWhen } from "@/components/calendar/calendar-format"
 import { expandCalendarEvents } from "@/lib/calendar/recurrence"
 import { formatDateTime } from "@/lib/format-date"
 import { relativeTime } from "@/lib/relative-time"
-import { getWorkspaceContext } from "@/lib/workspace/server"
+import { getMemberProfiles, getWorkspaceContext } from "@/lib/workspace/server"
 import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { addEventAttendee, deleteEvent, removeEventAttendee, respondEventAttendee, updateEvent } from "../actions"
 
@@ -42,8 +42,8 @@ export default async function EventPage({ params, searchParams }: { params: Prom
   const now = new Date()
   const myName = profile?.display_name ?? context.user.email?.split("@")[0] ?? "You"
   const isCreator = event.creator_id === context.user.id
-  // Profiles are only readable by their owner, so other people stay anonymous.
-  const nameFor = (userId: string | null) => (userId === context.user.id ? myName : "A workspace member")
+  const profiles = await getMemberProfiles(context, [...(members ?? []).map((member) => member.user_id), ...(attendees ?? []).flatMap((attendee) => (attendee.user_id ? [attendee.user_id] : [])), event.creator_id, ...(activityRows ?? []).flatMap((row) => (row.actor_id ? [row.actor_id] : []))])
+  const nameFor = (userId: string | null) => (userId === context.user.id ? myName : (userId && profiles.get(userId)?.name) || "A workspace member")
   const myEmail = context.user.email?.toLowerCase() ?? ""
   const next = event.recurrence_rule ? expandCalendarEvents([event], now, 400).find((occurrence) => new Date(occurrence.ends_at) >= now) : null
   const state: EventState = event.recurrence_rule ? "recurring" : new Date(event.ends_at) < now ? "past" : "upcoming"
@@ -74,9 +74,9 @@ export default async function EventPage({ params, searchParams }: { params: Prom
             userId: attendee.user_id,
             response: attendee.response,
             isMe: attendee.user_id === context.user.id || (Boolean(attendee.email) && attendee.email === myEmail),
-            label: attendee.email ?? (attendee.user_id === context.user.id ? myName : attendee.user_id ? "Member " + attendee.user_id.slice(0, 8) : "Workspace attendee"),
+            label: attendee.email ?? (attendee.user_id ? nameFor(attendee.user_id) : "Workspace attendee"),
           }))}
-          members={(members ?? []).map((member) => ({ value: member.user_id, label: member.user_id === context.user.id ? myName + " (you)" : "Member " + member.user_id.slice(0, 8) }))}
+          members={(members ?? []).map((member) => ({ value: member.user_id, label: member.user_id === context.user.id ? myName + " (you)" : nameFor(member.user_id) }))}
           activity={(activityRows ?? []).map((row) => ({ id: row.id, actor: nameFor(row.actor_id), action: activityText(row.action), at: formatDateTime(row.created_at), label: relativeTime(row.created_at, now) }))}
           actions={{ updateEvent, deleteEvent, addEventAttendee, removeEventAttendee, respondEventAttendee }}
         />

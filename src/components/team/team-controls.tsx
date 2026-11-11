@@ -32,22 +32,22 @@ function RowMenu({ label, item }: { label: string; item: (close: () => void) => 
 }
 
 /** Role picker (super admins only) and a ⋮ menu with "Remove member" for a manageable member row. */
-export function MemberControls({ userId, shortId, role, canChangeRole, changeMemberRole, removeMember }: { userId: string; shortId: string; role: string; canChangeRole: boolean; changeMemberRole: FormAction; removeMember: FormAction }) {
+export function MemberControls({ userId, label, role, canChangeRole, changeMemberRole, removeMember }: { userId: string; label: string; role: string; canChangeRole: boolean; changeMemberRole: FormAction; removeMember: FormAction }) {
   const [nextRole, setNextRole] = useState(role)
   return (
     <div className="flex flex-wrap items-center gap-2">
       {canChangeRole && (
         <form action={changeMemberRole} className="flex items-center gap-2">
           <input type="hidden" name="userId" value={userId} />
-          <label className="sr-only" htmlFor={"role-" + userId}>Role for member {shortId}</label>
+          <label className="sr-only" htmlFor={"role-" + userId}>Role for {label}</label>
           <Select id={"role-" + userId} name="role" value={nextRole} onChange={setNextRole} className="field-control min-h-0 w-28 py-1.5 text-xs" options={[{ value: "user", label: "User" }, { value: "admin", label: "Admin" }]} />
           {nextRole !== role && <SubmitButton className="button-secondary min-h-0 px-2.5 py-1.5 text-xs" pendingText="Saving…">Save</SubmitButton>}
         </form>
       )}
-      <RowMenu label={"Actions for member " + shortId} item={(close) => (
-        <form action={removeMember} onSubmit={(event) => { if (!window.confirm("Remove member " + shortId + " from this workspace? They lose access immediately.")) event.preventDefault(); else close() }}>
+      <RowMenu label={"Actions for " + label} item={(close) => (
+        <form action={removeMember} onSubmit={(event) => { if (!window.confirm("Remove " + label + " from this workspace? They lose access immediately.")) event.preventDefault(); else close() }}>
           <input type="hidden" name="id" value={userId} />
-          <button role="menuitem" className="text-danger" aria-label={"Remove member " + shortId}><UserMinus size={14} />Remove member</button>
+          <button role="menuitem" className="text-danger" aria-label={"Remove " + label}><UserMinus size={14} />Remove member</button>
         </form>
       )} />
     </div>
