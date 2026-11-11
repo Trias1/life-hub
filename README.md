@@ -12,7 +12,7 @@ Built by Trias. Released under the [MIT License](LICENSE).
 |---|---|
 | Notes | Rich text with images, folders, tags and pins. Every edit keeps a version you can restore. |
 | Tasks | A list and a board, with labels, due dates, checklists, comments and file attachments. |
-| Calendar | Agenda, month, week and day views, repeating events and reminders, with your Google Calendar shown alongside. |
+| Calendar | Agenda, month, week and day views, repeating events and reminders, with your Google Calendar shown alongside. Times are entered and shown in Asia/Jakarta time. |
 | Files | Kept in a folder in your own Google Drive, with versions and share links that expire. |
 | Bookmarks | Titles are filled in from the page. Group them into collections and import or export CSV. |
 | Team | Separate workspaces with member, admin and owner roles. People accept or decline invitations by email. |
@@ -59,7 +59,7 @@ You need Node.js 20 or newer, a [Supabase](https://supabase.com) project and a [
    npm run dev
    ```
 
-   Open http://localhost:3000, create an account, then connect Google Drive from Settings as a workspace admin.
+   Open http://localhost:3000 and create an account. As the workspace owner, connect Google Drive from Settings → Integrations. To see your Google Calendar next to your events, connect your Google account from Profile.
 
 ### Deploying
 
@@ -74,7 +74,7 @@ Any Node.js host that runs Next.js works. On Vercel, add the same environment va
 | `SUPABASE_SECRET_KEY` | yes | Supabase secret key. Server only. |
 | `SUPABASE_JWKS_URL` | yes | `https://<project>.supabase.co/auth/v1/.well-known/jwks.json` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | yes | OAuth client used to connect Google Drive and Google Calendar. |
-| `GOOGLE_TOKEN_ENCRYPTION_KEY` | yes | Random secret that encrypts stored Google refresh tokens. |
+| `GOOGLE_TOKEN_ENCRYPTION_KEY` | yes | Random secret that encrypts stored Google refresh tokens. Set it before anyone connects Google: tokens saved under a different key can't be read, so changing it later means reconnecting Google Drive and Google accounts. |
 | `DATA_ENCRYPTION_KEY` | recommended | 32 random bytes, base64. Encrypts free text at rest (see below). Keep a backup: values encrypted with a lost key cannot be recovered. |
 | `DATA_ENCRYPTION_WRITE` | recommended | Set to exactly `on` to encrypt new writes. Reads always decrypt. |
 | `NEXT_PUBLIC_APP_URL` | yes in production | Public URL, used in invitation links. |
@@ -95,8 +95,12 @@ Never prefix a secret with `NEXT_PUBLIC_`, and never commit `.env.local`.
 
 - Postgres row-level security checks every read and write, not only the app code.
 - Free text such as note bodies, task descriptions, comments, checklist items and bookmark URLs is encrypted with AES-256-GCM before it is stored, when `DATA_ENCRYPTION_KEY` and `DATA_ENCRYPTION_WRITE=on` are set. Titles stay readable so search and sorting keep working.
-- Search, uploads, exports and sign-in related endpoints are rate limited, and mutating requests must come from the same origin.
-- File downloads are checked against the active workspace, and share links are hashed and expire.
+- Search, uploads, exports, sign-in related endpoints and password changes are rate limited, and the limits fail closed if the limiter can't answer. Mutating API requests must come from the same origin.
+- File downloads are checked against the active workspace. Share links are hashed, can expire, and stop working once the file is moved to the trash.
+- Only the workspace owner can connect or disconnect Google Drive. Invitations are capped per person per day, and a pending invitation can't be sent twice.
+- Changing the password signs out every other session, and Security → Active sessions can sign out all other devices at any time.
+- Bookmark link previews only fetch public addresses on the default ports, and CSV exports neutralise spreadsheet formulas.
+- Responses carry a baseline Content-Security-Policy, HSTS, `X-Frame-Options: DENY`, `nosniff`, and cross-origin opener/resource policies.
 - Sessions use Supabase SSR cookies; nothing sensitive is kept in `localStorage`.
 
 Found a vulnerability? Please open a private security advisory on GitHub instead of a public issue.
