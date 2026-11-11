@@ -36,6 +36,8 @@ export function ProfileStudio({
   disconnectGoogle,
 }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
+  // Remember a photo URL that failed (e.g. its Drive is disconnected) and show the initial instead of a broken image.
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const name = profile?.display_name || email.split("@")[0] || "Sanctum Cove user";
   const completion =
     [
@@ -200,13 +202,15 @@ export function ProfileStudio({
           : tab === "sessions"
             ? sessions
             : accounts;
-  const avatar = avatarUrl ? (
+  const showPhoto = Boolean(avatarUrl) && avatarUrl !== failedAvatarUrl;
+  const avatar = showPhoto && avatarUrl ? (
     <Image
       src={avatarUrl}
       alt={name + " profile photo"}
       width={160}
       height={160}
       unoptimized
+      onError={() => setFailedAvatarUrl(avatarUrl)}
       className="h-full w-full rounded-full object-cover"
     />
   ) : (
@@ -220,11 +224,11 @@ export function ProfileStudio({
         <div className="relative -mt-10 flex flex-col gap-5 px-5 pb-6 sm:flex-row sm:items-end">
           <div
             className={
-              avatarUrl
+              showPhoto
                 ? "profile-avatar profile-avatar-image"
                 : "profile-avatar"
             }
-            aria-label={avatarUrl ? name + " profile photo" : undefined}
+            aria-label={showPhoto ? name + " profile photo" : undefined}
           >
             {avatar}
           </div>

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Mail, Search } from "lucide-react"
 import { Select } from "@/components/ui/select"
+import { MemberAvatar } from "@/components/member-avatar"
 import { InvitationLinkNotice, InvitationMenu, MemberControls } from "@/components/team/team-controls"
 import { relativeTime } from "@/lib/relative-time"
 import { getMemberProfiles, getWorkspaceContext } from "@/lib/workspace/server"
@@ -135,10 +136,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             const name = profile?.name ?? "Member " + shortId
             return (
               <li key={member.user_id} className="issue-row flex-wrap items-center sm:flex-nowrap">
-                {profile?.avatarUrl
-                  // eslint-disable-next-line @next/next/no-img-element -- served by our own authenticated route, not optimisable by next/image
-                  ? <img src={profile.avatarUrl} alt="" width={32} height={32} loading="lazy" className="size-8 shrink-0 self-start rounded-full object-cover sm:self-center" />
-                  : <span aria-hidden className="grid size-8 shrink-0 place-items-center self-start rounded-full bg-[var(--surface-muted)] text-sm font-bold uppercase text-[var(--foreground)] sm:self-center">{name.slice(0, 1)}</span>}
+                <MemberAvatar src={profile?.avatarUrl ?? null} name={name} className="self-start sm:self-center" />
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-1.5">
                     <span className="text-sm font-semibold text-[var(--foreground)]">{name}</span>

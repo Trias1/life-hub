@@ -53,7 +53,7 @@ export function NoteImportForm({ action, existingTitles, folders }: { action: Im
         <>
           <section aria-labelledby="import-preview-heading" className="grid gap-3">
             <h2 id="import-preview-heading" className="issue-section-title">
-              Preview · {parsed.entries.length - appendCount} new, {appendCount} added to existing{parsed.skipped.length ? ", " + parsed.skipped.length + " lines skipped" : ""}
+              Preview · {parsed.entries.length - appendCount} new, {appendCount} added to existing{parsed.skipped.length ? ", " + parsed.skipped.length + (parsed.skipped.length === 1 ? " line skipped" : " lines skipped") : ""}
             </h2>
             {tooMany && <p role="alert" className="text-sm font-medium text-danger">That file has more than 100 notes. Split it into smaller files.</p>}
             <ul className="issue-list">
@@ -64,7 +64,7 @@ export function NoteImportForm({ action, existingTitles, folders }: { action: Im
                     <FileText size={16} className="issue-row-icon" aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="issue-row-title">{entry.title}</p>
-                      <p className="issue-row-meta truncate">{entry.lines.join(" · ")}</p>
+                      <p className="issue-row-meta truncate">{entry.lines.map((line) => line.replace(/^([-*•]|\d+[.)])\s+/, "")).join(" · ")}</p>
                     </div>
                     <span className="tag-chip" data-tone={appending ? "amber" : "teal"}>{appending ? "Add to existing" : "New"}</span>
                   </li>
