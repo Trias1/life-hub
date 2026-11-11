@@ -340,7 +340,7 @@ export function Sidebar({
                         Connect Google Drive
                       </a>
                     ) : (
-                      <p className="mt-2 font-semibold">Ask a workspace admin to reconnect it.</p>
+                      <p className="mt-2 font-semibold">Ask the workspace owner to reconnect it.</p>
                     )}
                   </div>
                 )}
