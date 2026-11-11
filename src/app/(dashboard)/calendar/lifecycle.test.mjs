@@ -10,6 +10,7 @@ const detailPage = read("./[id]/page.tsx");
 const detail = read("../../../components/calendar/event-detail.tsx");
 const fields = read("../../../components/calendar/event-fields.tsx");
 const board = read("../../../components/calendar-board.tsx");
+const timeRange = read("../../../components/calendar/event-time-range.tsx");
 
 function actionSource(name, nextName) {
   const start = actions.indexOf(`export async function ${name}(`);
@@ -21,12 +22,13 @@ function actionSource(name, nextName) {
 test("creating an event opens the new event instead of the list", () => {
   const source = actionSource("createEvent", "updateEvent");
   assert.match(source, /redirect\("\/calendar\/" \+ event\.id/);
-  assert.match(source, /actionFailure\("\/calendar\/new", "create event"\)/);
+  assert.match(source, /actionFailure\("\/calendar\/new", "create event", error\)/);
   assert.match(source, /workspace_id: context\.workspaceId, creator_id: context\.user\.id/);
 });
 
 test("events must end after they start", () => {
-  assert.match(actions, /\.refine\(\(value\) => value\.endsAt > value\.startsAt\)/);
+  assert.match(actions, /\.refine\(\(value\) => value\.endsAt > value\.startsAt, \{ path: \["endsAt"\] \}\)/);
+  assert.match(actions, /The event must end after it starts\./);
 });
 
 test("event edits and deletes stay scoped to the creator in the active workspace", () => {
@@ -52,8 +54,9 @@ test("calendar routes: list, new form and issue-style detail", () => {
   assert.doesNotMatch(listPage, /createEvent/);
   assert.match(newPage, /action=\{createEvent\}/);
   assert.match(newPage, /isDayKey\(date\)/);
-  assert.match(fields, /name="startsAt"/);
-  assert.match(fields, /name="endsAt"/);
+  assert.match(fields, /<EventTimeRange startsAt=\{defaults\.startsAt\} endsAt=\{defaults\.endsAt\} \/>/);
+  assert.match(timeRange, /name="startsAt"/);
+  assert.match(timeRange, /name="endsAt"/);
   assert.match(detailPage, /\.eq\("workspace_id", context\.workspaceId\)/);
   assert.match(detail, /actions\.deleteEvent/);
   assert.match(detail, /actions\.respondEventAttendee/);

@@ -18,7 +18,16 @@ const eventSchema = z.object({
   recurrence: z.enum(["daily", "weekly", "monthly"]).optional(),
   color: z.enum(["indigo", "blue", "emerald", "rose"]).default("indigo"),
   reminder: z.coerce.number().int().min(0).max(10080).default(0),
-}).refine((value) => value.endsAt > value.startsAt)
+}).refine((value) => value.endsAt > value.startsAt, { path: ["endsAt"] })
+
+/** A specific reason for an invalid event form, so the user knows what to fix. */
+function eventFormMessage(issues: Array<{ path: PropertyKey[] }>) {
+  const field = String(issues[0]?.path[0] ?? "")
+  if (field === "endsAt" || field === "startsAt") return "The event must end after it starts."
+  if (field === "title") return "Give the event a title (up to 160 characters)."
+  if (field === "description") return "Keep the description under 1000 characters."
+  return "Some fields are invalid. Check the form and try again."
+}
 
 function parseEvent(formData: FormData) {
   return eventSchema.safeParse({ title: formData.get("title"), description: formData.get("description") ?? "", startsAt: formData.get("startsAt"), endsAt: formData.get("endsAt"), recurrence: formData.get("recurrence") || undefined, color: formData.get("color") || "indigo", reminder: formData.get("reminder") || 0 })
@@ -26,7 +35,7 @@ function parseEvent(formData: FormData) {
 
 export async function createEvent(formData: FormData): Promise<void> {
   const input = parseEvent(formData)
-  if (!input.success) actionFailure("/calendar/new", "create event")
+  if (!input.success) redirect("/calendar/new?error=" + encodeURIComponent(eventFormMessage(input.error.issues)))
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/calendar/new", "access the active workspace")
 
@@ -43,7 +52,7 @@ export async function updateEvent(formData: FormData): Promise<void> {
   const input = parseEvent(formData)
   if (!id.success) actionFailure("/calendar", "update event")
   const eventPath = "/calendar/" + id.data
-  if (!input.success) actionFailure(eventPath, "update event")
+  if (!input.success) redirect(eventPath + "?error=" + encodeURIComponent(eventFormMessage(input.error.issues)))
   const context = await getWorkspaceContext()
   if (!context) actionFailure(eventPath, "access the active workspace")
 

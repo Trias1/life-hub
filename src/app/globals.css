@@ -892,6 +892,12 @@ html[data-theme="light"] .lifehub-sidebar .workspace-switch-current-label {
   min-width: 7.5rem;
 }
 
+/* End before start: outline both parts of the picker, not just the time box. */
+.date-time-picker:has([aria-invalid="true"]) .date-time-picker-trigger,
+.date-time-picker [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
 .date-time-picker-popover {
   position: absolute;
   top: calc(100% + 0.5rem);
