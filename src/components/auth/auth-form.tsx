@@ -53,7 +53,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       return setError(friendlyError(result.error.message))
     }
     if (mode === "login") {
-      router.replace("/dashboard")
+      // Accounts with an authenticator app finish signing in on the 6-digit code step.
+      const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      router.replace(assurance?.nextLevel === "aal2" && assurance.currentLevel !== "aal2" ? "/mfa" : "/dashboard")
       router.refresh()
       return
     }

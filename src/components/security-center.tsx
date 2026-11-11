@@ -3,14 +3,16 @@
 import { formatDateTime } from "@/lib/format-date"
 import { passwordStrength } from "@/lib/password-strength"
 import { Turnstile, type TurnstileHandle } from "@/components/auth/turnstile"
+import { TwoFactorSettings } from "@/components/security/two-factor-settings"
 
 import { useRef, useState } from "react"
 import { CheckCircle2, Eye, EyeOff, Laptop, ShieldCheck, TriangleAlert } from "lucide-react"
 
 type PasswordAction = (formData: FormData) => Promise<void>
 type SignOutAction = () => Promise<void>
-type Section = "password" | "two-factor" | "sessions" | "devices" | "history" | "tokens" | "recovery" | "danger"
-const sections: Array<[Section, string]> = [["password", "Password"], ["two-factor", "Two-factor authentication"], ["sessions", "Active sessions"], ["devices", "Connected devices"], ["history", "Login history"], ["tokens", "API tokens"], ["recovery", "Recovery codes"], ["danger", "Danger zone"]]
+// Only controls that work; no placeholders for features the app doesn't have.
+type Section = "password" | "two-factor" | "sessions" | "history" | "danger"
+const sections: Array<[Section, string]> = [["password", "Password"], ["two-factor", "Two-factor authentication"], ["sessions", "Active sessions"], ["history", "Last sign-in"], ["danger", "Danger zone"]]
 
 /** Asks before running a destructive form action, so a stray tap can't end sessions. */
 function confirmSubmit(message: string) {
@@ -57,9 +59,8 @@ export function SecurityCenter({ email, lastSignIn, updatePassword, signOut, sig
         {signOutThisDevice}
       </div>
     </div>
-  ) : section === "devices" ? <div className="space-y-4"><p className="text-lg font-semibold">Connected devices</p>{currentSession}<p className="text-sm text-zinc-500">Additional device inventory requires an identity provider session API.</p></div>
-    : section === "history" ? <div className="space-y-4"><p className="text-lg font-semibold">Login history</p><article className="profile-activity-row"><CheckCircle2 className="text-emerald-500" /><div><p className="font-medium">Successful sign-in</p><p className="text-sm text-zinc-500">{lastSignIn ? formatDateTime(lastSignIn) : "No sign-in timestamp available"}</p></div></article></div>
-    : section === "danger" ? <div className="space-y-4"><TriangleAlert className="h-8 w-8 text-red-500" /><p className="text-lg font-semibold">Danger zone</p><p className="text-sm text-zinc-500">Signing out removes this browser session. Account and workspace deletion require verified support workflows.</p>{signOutThisDevice}</div>
-    : <div className="space-y-4"><ShieldCheck className="h-8 w-8 text-[var(--accent)]" /><p className="text-lg font-semibold">{sections.find((item) => item[0] === section)?.[1]}</p><p className="text-sm leading-6 text-zinc-500">This control is ready for a configured identity or token provider. It remains unavailable rather than showing fake security data.</p>{section === "two-factor" && <div className="rounded-xl border p-4 text-sm"><strong>Disabled</strong><p className="mt-1 text-zinc-500">Enable it after connecting an authentication provider with MFA support.</p></div>}</div>
+  ) : section === "two-factor" ? <TwoFactorSettings />
+    : section === "history" ? <div className="space-y-4"><p className="text-lg font-semibold">Last sign-in</p><article className="profile-activity-row"><CheckCircle2 className="text-emerald-500" /><div><p className="font-medium">Successful sign-in</p><p className="text-sm text-zinc-500">{lastSignIn ? formatDateTime(lastSignIn) : "No sign-in timestamp available"}</p></div></article></div>
+    : <div className="space-y-4"><TriangleAlert className="h-8 w-8 text-red-500" /><p className="text-lg font-semibold">Danger zone</p><p className="text-sm text-zinc-500">Signing out removes this browser session. Account and workspace deletion require verified support workflows.</p>{signOutThisDevice}</div>
   return <div className="page-container"><header className="page-header"><div><p className="eyebrow">Account protection</p><h1 className="page-title">Security</h1><p className="page-description">Manage password, current access, and security controls in one focused place.</p></div><ShieldCheck className="h-8 w-8 text-[var(--accent)]" /></header><div className="mt-8 grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]"><nav className="settings-nav h-fit">{sections.map(([id, label]) => <button key={id} type="button" onClick={() => setSection(id)} aria-current={section === id ? "page" : undefined} className={"settings-nav-item " + (section === id ? "settings-nav-item-active" : "")}>{label}</button>)}</nav><section className="settings-panel">{content}</section></div></div>
 }
