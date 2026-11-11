@@ -1598,6 +1598,11 @@ html[data-theme="dark"] .issue-state[data-state="trash"] { color: #fda4af; }
 .note-prose { max-width: 75ch; font-size: 0.95rem; line-height: 1.7; color: var(--foreground); overflow-wrap: anywhere; }
 .note-prose > * + * { margin-top: 0.75rem; }
 .note-prose > :first-child { margin-top: 0; }
+/* Privacy and terms pages. */
+.legal-prose { display: grid; gap: 0.9rem; line-height: 1.75; color: var(--foreground); }
+.legal-prose h2 { margin-top: 1.25rem; font-size: 1.2rem; font-weight: 700; }
+.legal-prose ul { display: grid; gap: 0.5rem; padding-left: 1.25rem; list-style: disc; }
+.legal-prose a { text-decoration: underline; text-underline-offset: 2px; }
 /* Note view: "label : value" lists as one card per account. */
 .note-segments { display: grid; gap: 0.9rem; max-width: 75ch; }
 .note-import-drop { display: flex; align-items: center; gap: 0.6rem; min-height: 3.5rem; cursor: pointer; border: 1px dashed var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 0.75rem 1rem; color: var(--foreground); }
