@@ -73,7 +73,10 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
 
       <div className="issue-page-head">
         <h1 className="issue-title">Notes</h1>
-        <Link href="/notes/new" className="button-primary min-h-0 px-3.5 py-2">New note</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/notes/import" className="button-secondary min-h-0 px-3.5 py-2">Import from file</Link>
+          <Link href="/notes/new" className="button-primary min-h-0 px-3.5 py-2">New note</Link>
+        </div>
       </div>
       <div className="issue-list-head">
         <nav aria-label="Notes views" className="issue-tabs">

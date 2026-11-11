@@ -158,7 +158,7 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
               <span>Note created <time dateTime={createdIso} title={createdAt}>{createdLabel}</time> by <strong>{authorName}</strong></span>
             </p>
             {message && <p role="status" className="mt-3 text-xs text-[var(--muted)]">{message}</p>}
-            <div className="issue-body"><NoteViewer content={note.content} /></div>
+            <div className="issue-body"><NoteViewer content={note.content} accountCards /></div>
           </>
         )}
 

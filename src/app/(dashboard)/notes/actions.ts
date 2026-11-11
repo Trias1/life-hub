@@ -6,6 +6,7 @@ import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
 import { FIELD, decryptField, encryptField } from "@/lib/data-crypto.mjs"
+import { IMPORT_LIMITS, entryHtml, parseNotesFile } from "@/lib/notes-import.mjs"
 
 const noteSchema = z.object({ title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80), tags: z.string().max(500) })
 const updateSchema = z.object({ id: z.string().uuid(), title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80).optional(), tags: z.string().max(500).optional() })
@@ -156,4 +157,78 @@ export async function toggleNoteFavorite(formData: FormData): Promise<void> {
   revalidatePath("/notes")
   revalidatePath("/notes/" + input.data.id)
   revalidatePath("/activity")
+}
+
+const importOptionsSchema = z.object({ folder: z.string().trim().min(1).max(80), tags: z.string().max(500) })
+const importedStamp = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short", year: "numeric" })
+
+function importFailure(message: string): never {
+  redirect("/notes/import?error=" + encodeURIComponent(message))
+}
+
+/**
+ * Creates notes from a plain-text list ("title : text" per note). The file is re-read here with the
+ * same parser the preview used. A title that matches one of your active notes (ignoring case) is
+ * appended to that note, and its previous content is kept in the version history.
+ */
+export async function importNotes(formData: FormData): Promise<void> {
+  const text = formData.get("text")
+  if (typeof text !== "string" || !text.trim()) importFailure("Choose a .txt file with at least one \"title : text\" line.")
+  if (new TextEncoder().encode(text).byteLength > IMPORT_LIMITS.bytes) importFailure("That file is larger than 200 KB. Split it into smaller files.")
+  const options = importOptionsSchema.safeParse({ folder: formData.get("folder") || "General", tags: formData.get("tags") ?? "" })
+  if (!options.success) importFailure("Use a folder name of up to 80 characters and fewer tags.")
+  const { entries } = parseNotesFile(text)
+  if (!entries.length) importFailure("No notes found. Write each one as \"title : text\" on its own line.")
+  if (entries.length > IMPORT_LIMITS.entries) importFailure("That file has more than 100 notes. Split it into smaller files.")
+  const context = await getWorkspaceContext()
+  if (!context) importFailure("Your session expired. Sign in again.")
+
+  const { data: existing, error: existingError } = await context.supabase.from("notes").select("id,title,content,workspace_id").eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).is("deleted_at", null).is("archived_at", null).order("updated_at", { ascending: false })
+  if (existingError) actionFailure("/notes/import", "import notes", existingError)
+  const byTitle = new Map<string, NonNullable<typeof existing>[number]>()
+  for (const note of existing ?? []) if (!byTitle.has(note.title.trim().toLowerCase())) byTitle.set(note.title.trim().toLowerCase(), note)
+  const tags = parseTags(options.data.tags)
+  const stamp = importedStamp.format(new Date())
+  let created = 0
+  let appended = 0
+  const failed: string[] = []
+
+  for (const entry of entries) {
+    const html = entryHtml(entry)
+    const match = byTitle.get(entry.title.toLowerCase())
+    if (match) {
+      let previous: string
+      try {
+        previous = decryptField(FIELD.NOTE_CONTENT, match.content)
+      } catch {
+        failed.push(entry.title)
+        continue
+      }
+      const next = previous + "<hr><p>Imported " + stamp + "</p>" + html
+      if (next.length > 10000) {
+        failed.push(entry.title)
+        continue
+      }
+      // Keep what was there before, so the import can be undone from the note's history.
+      const { error: versionError } = await context.supabase.from("note_versions").insert({ note_id: match.id, workspace_id: match.workspace_id, editor_id: context.user.id, title: match.title, content: match.content })
+      const { error } = versionError ? { error: versionError } : await context.supabase.from("notes").update({ content: encryptField(FIELD.NOTE_CONTENT, next), updated_at: new Date().toISOString() }).eq("id", match.id).eq("author_id", context.user.id)
+      if (error) failed.push(entry.title)
+      else appended++
+    } else {
+      if (html.length > 10000) {
+        failed.push(entry.title)
+        continue
+      }
+      const { error } = await context.supabase.from("notes").insert({ title: entry.title, content: encryptField(FIELD.NOTE_CONTENT, html), folder: options.data.folder, tags, workspace_id: context.workspaceId, author_id: context.user.id })
+      if (error) failed.push(entry.title)
+      else created++
+    }
+  }
+
+  if (created + appended) await recordActivity(context, { action: "Imported " + (created + appended) + (created + appended === 1 ? " note" : " notes"), entityType: "note", link: "/notes" })
+  revalidatePath("/notes")
+  revalidatePath("/activity")
+  const summary = [created && created + " new", appended && appended + " added to existing notes"].filter(Boolean).join(", ")
+  if (failed.length) redirect("/notes?error=" + encodeURIComponent((summary ? "Imported " + summary + ". " : "") + "Could not import: " + failed.slice(0, 5).join(", ") + (failed.length > 5 ? " and " + (failed.length - 5) + " more" : "") + " (too long or unreadable)."))
+  redirect("/notes?success=" + encodeURIComponent("Imported " + summary))
 }

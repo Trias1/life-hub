@@ -1598,6 +1598,19 @@ html[data-theme="dark"] .issue-state[data-state="trash"] { color: #fda4af; }
 .note-prose { max-width: 75ch; font-size: 0.95rem; line-height: 1.7; color: var(--foreground); overflow-wrap: anywhere; }
 .note-prose > * + * { margin-top: 0.75rem; }
 .note-prose > :first-child { margin-top: 0; }
+/* Note view: "label : value" lists as one card per account. */
+.note-segments { display: grid; gap: 0.9rem; max-width: 75ch; }
+.note-import-drop { display: flex; align-items: center; gap: 0.6rem; min-height: 3.5rem; cursor: pointer; border: 1px dashed var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 0.75rem 1rem; color: var(--foreground); }
+.note-import-drop:hover, #import-file:focus-visible + .note-import-drop { border-color: var(--accent); }
+#import-file:focus-visible + .note-import-drop { outline: 2px solid var(--accent); outline-offset: 2px; }
+.note-accounts { display: grid; gap: 0.6rem; list-style: none; margin: 0; padding: 0; }
+.note-account { display: flex; align-items: flex-start; gap: 0.75rem; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 0.75rem 0.9rem; }
+.note-account-initials { display: grid; place-items: center; flex-shrink: 0; width: 2.1rem; height: 2.1rem; border-radius: 9999px; background: var(--surface-muted); color: var(--foreground); font-size: 0.78rem; font-weight: 700; }
+.note-account-value { min-width: 0; overflow-wrap: anywhere; font-size: 0.92rem; font-weight: 600; color: var(--foreground); }
+.note-account-copy { display: grid; place-items: center; flex-shrink: 0; min-width: 2rem; min-height: 2rem; border-radius: var(--radius-control); color: var(--muted); }
+.note-account-copy:hover { background: var(--surface-muted); color: var(--foreground); }
+.note-account-labels { display: flex; flex-wrap: wrap; gap: 0.35rem; list-style: none; margin: 0.35rem 0 0; padding: 0; }
+.note-account-labels li { border: 1px solid var(--line); border-radius: 9999px; background: var(--surface-muted); padding: 0.1rem 0.6rem; font-size: 0.75rem; color: var(--foreground); }
 .note-prose h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin-top: 1.5rem; }
 .note-prose h2 { font-size: 1.25rem; font-weight: 700; line-height: 1.35; margin-top: 1.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--line); }
 .note-prose h3 { font-size: 1.05rem; font-weight: 600; margin-top: 1.2rem; }

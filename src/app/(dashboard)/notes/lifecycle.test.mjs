@@ -73,3 +73,27 @@ test("note content is encrypted on write and decrypted on read", () => {
   assert.match(actionSource("restoreNoteVersion", "archiveNote"), /decryptField\(FIELD\.NOTE_CONTENT, version\.content\)/)
   assert.match(page, /decryptField\(FIELD\.NOTE_CONTENT, note\.content\)/)
 })
+
+test("importing notes re-reads the file on the server and only appends to your own notes", () => {
+  const source = actions.slice(actions.indexOf("export async function importNotes"));
+  const listPage = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+  const importPage = readFileSync(new URL("./import/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /parseNotesFile\(text\)/);
+  assert.match(source, /byteLength > IMPORT_LIMITS\.bytes/);
+  assert.match(source, /entries\.length > IMPORT_LIMITS\.entries/);
+  assert.match(source, /\.eq\("workspace_id", context\.workspaceId\)\.eq\("author_id", context\.user\.id\)\.is\("deleted_at", null\)\.is\("archived_at", null\)/);
+  assert.match(source, /from\("note_versions"\)\.insert\(\{ note_id: match\.id/);
+  assert.match(source, /update\(\{ content: encryptField\(FIELD\.NOTE_CONTENT, next\)/);
+  assert.match(source, /\.eq\("id", match\.id\)\.eq\("author_id", context\.user\.id\)/);
+  assert.match(source, /insert\(\{ title: entry\.title, content: encryptField\(FIELD\.NOTE_CONTENT, html\)/);
+  assert.match(listPage, /href="\/notes\/import"/);
+  assert.match(importPage, /action=\{importNotes\}/);
+});
+
+test("account cards are shown on notes only, not on task descriptions", () => {
+  const taskDetails = readFileSync(new URL("../../../components/task-details.tsx", import.meta.url), "utf8");
+  const viewer = readFileSync(new URL("../../../components/notes/note-viewer.tsx", import.meta.url), "utf8");
+  assert.match(workspace, /<NoteViewer content=\{note\.content\} accountCards \/>/);
+  assert.doesNotMatch(taskDetails, /accountCards/);
+  assert.doesNotMatch(viewer, /dangerouslySetInnerHTML/);
+});
