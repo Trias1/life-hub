@@ -124,7 +124,9 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
   async function assertWorkspaceObject(drive: Drive, connection: Awaited<ReturnType<typeof workspaceClient>>["connection"] | null, fileId: string, destination = false) {
     if (!/^[a-zA-Z0-9_-]{1,256}$/.test(fileId)) throw new Error("Invalid file id")
     if (workspaceId) {
-      const rootId = connection?.root_folder_id
+      // A reconnect recreates the connection without root_folder_id; look the LifeHub folder up again
+      // (and save it) instead of failing every read until the next upload happens to set it.
+      const rootId = connection?.root_folder_id ?? await rootFolder(drive, connection)
       if (!rootId) throw new Error("Workspace folder not found")
       const workspaces = await findFolder(drive, "workspaces", rootId)
       const folder = workspaces?.id ? await findFolder(drive, workspaceId, workspaces.id) : null
