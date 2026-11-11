@@ -21,7 +21,10 @@ export async function updatePassword(formData: FormData): Promise<void> {
   const { data: limit, error: limitError } = await supabase.rpc("consume_request_rate_limit", { p_bucket: "password" })
   // Fail closed: if the limiter can't answer, don't allow an unthrottled password guess.
   if (limitError || !limit || limit.allowed !== true) fail("Too many attempts. Wait a minute and try again.")
-  const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password: input.data.currentPassword })
+  // Checking the current password is a sign-in, so Supabase also wants the Turnstile token from the form.
+  const captchaToken = formData.get("captchaToken")
+  const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password: input.data.currentPassword, options: typeof captchaToken === "string" && captchaToken ? { captchaToken } : undefined })
+  if (verifyError && /captcha/i.test(verifyError.message)) fail("The security check didn't pass. Wait a moment and try again.")
   if (verifyError) fail("Your current password is incorrect.")
   const { error } = await supabase.auth.updateUser({ password: input.data.newPassword })
   if (error) fail("Could not update your password. Please try again.")

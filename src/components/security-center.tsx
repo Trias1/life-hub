@@ -2,8 +2,9 @@
 
 import { formatDateTime } from "@/lib/format-date"
 import { passwordStrength } from "@/lib/password-strength"
+import { Turnstile, type TurnstileHandle } from "@/components/auth/turnstile"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { CheckCircle2, Eye, EyeOff, Laptop, ShieldCheck, TriangleAlert } from "lucide-react"
 
 type PasswordAction = (formData: FormData) => Promise<void>
@@ -21,6 +22,8 @@ export function SecurityCenter({ email, lastSignIn, updatePassword, signOut, sig
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
+  const captcha = useRef<TurnstileHandle>(null)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const strength = password ? passwordStrength(password) : null
   const mismatch = confirm.length > 0 && confirm !== password
   const inputType = showPassword ? "text" : "password"
@@ -41,7 +44,9 @@ export function SecurityCenter({ email, lastSignIn, updatePassword, signOut, sig
       {strength && <p id="security-strength" className="auth-strength" data-tone={strength.tone} aria-live="polite"><span aria-hidden /> {strength.label}</p>}
       <label className="field-label">Confirm new password<input required minLength={8} maxLength={128} name="confirmPassword" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} type={inputType} aria-invalid={mismatch || undefined} aria-describedby={mismatch ? "security-mismatch" : undefined} className="field-control" /></label>
       {mismatch && <p id="security-mismatch" role="alert" className="text-sm text-danger">Passwords don&apos;t match yet.</p>}
-      <div className="flex justify-end"><button disabled={password.length < 8 || confirm !== password} className="button-primary disabled:cursor-not-allowed disabled:opacity-60">Save password</button></div>
+      <input type="hidden" name="captchaToken" value={captchaToken ?? ""} />
+      <Turnstile ref={captcha} onToken={setCaptchaToken} />
+      <div className="flex justify-end"><button disabled={password.length < 8 || confirm !== password || !captchaToken} className="button-primary disabled:cursor-not-allowed disabled:opacity-60">Save password</button></div>
     </form>
   ) : section === "sessions" ? (
     <div className="space-y-5">

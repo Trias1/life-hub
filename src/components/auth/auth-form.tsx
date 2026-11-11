@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { FormEvent, useState } from "react"
+import { FormEvent, useRef, useState } from "react"
 import { Eye, EyeOff, MailCheck } from "lucide-react"
 import { passwordStrength } from "@/lib/password-strength"
 import { createClient } from "@/lib/supabase/client"
+import { Turnstile, type TurnstileHandle } from "./turnstile"
 
 type AuthMode = "login" | "register"
 
@@ -14,6 +15,7 @@ function friendlyError(message: string) {
   if (/email not confirmed/i.test(message)) return "Confirm your email first. Open the link we sent to your inbox."
   if (/rate limit|too many/i.test(message)) return "Too many attempts. Wait a few minutes and try again."
   if (/already registered/i.test(message)) return "An account with this email already exists. Sign in instead."
+  if (/captcha/i.test(message)) return "The security check didn't pass. Wait a moment and try again."
   return message
 }
 
@@ -26,6 +28,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const strength = mode === "register" && password ? passwordStrength(password) : null
+  const captcha = useRef<TurnstileHandle>(null)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -34,12 +38,16 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) return setError("Enter a valid email address.")
     if (!password) return setError("Enter your password.")
     if (mode === "register" && password.length < 8) return setError("Use at least 8 characters for your password.")
+    if (!captchaToken) return setError("Wait a moment for the security check to finish, then try again.")
     setLoading(true)
     setError("")
     const supabase = createClient()
+    // Supabase Auth checks this Turnstile token server-side (Attack Protection), which stops scripted guessing.
     const result = mode === "login"
-      ? await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
-      : await supabase.auth.signUp({ email: trimmedEmail, password, options: { emailRedirectTo: `${window.location.origin}/verify-email` } })
+      ? await supabase.auth.signInWithPassword({ email: trimmedEmail, password, options: { captchaToken } })
+      : await supabase.auth.signUp({ email: trimmedEmail, password, options: { emailRedirectTo: `${window.location.origin}/verify-email`, captchaToken } })
+    // A token works once; get a fresh one for the next attempt.
+    captcha.current?.reset()
     if (result.error) {
       setLoading(false)
       return setError(friendlyError(result.error.message))
@@ -81,8 +89,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         </div>
         {strength && <p id="auth-strength" className="auth-strength" data-tone={strength.tone}><span aria-hidden /> {strength.label}</p>}
       </div>
+      <Turnstile ref={captcha} onToken={setCaptchaToken} />
       {error && <p id="auth-error" role="alert" className="auth-alert" data-tone="error">{error}</p>}
-      <button disabled={loading} className="button-primary w-full disabled:opacity-60">{loading ? (mode === "login" ? "Signing in…" : "Creating account…") : mode === "login" ? "Sign in" : "Create account"}</button>
+      <button disabled={loading || !captchaToken} aria-busy={!captchaToken || undefined} className="button-primary w-full disabled:opacity-60">{loading ? (mode === "login" ? "Signing in…" : "Creating account…") : mode === "login" ? "Sign in" : "Create account"}</button>
     </form>
   )
 }
