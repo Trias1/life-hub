@@ -1,3 +1,4 @@
+import { AVATAR_MARKER, hasAvatar } from "@/lib/avatar-storage";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace/server";
 import { redirect } from "next/navigation";
@@ -54,7 +55,7 @@ export default async function DashboardLayout({
       .order("created_at"),
     context.supabase
       .from("profiles")
-      .select("display_name,avatar_google_file_id,avatar_workspace_id,updated_at")
+      .select("display_name,avatar_url,avatar_google_file_id,avatar_workspace_id,updated_at")
       .eq("id", context.user.id)
       .maybeSingle(),
     context.supabase
@@ -141,9 +142,9 @@ export default async function DashboardLayout({
     }
   }
   const invitations = await invitationsPromise;
-  // Skip the avatar request when it lives in this workspace's Drive and that Drive is disconnected.
-  const avatarUnavailable = !driveConnected && profile?.avatar_workspace_id === context.workspaceId;
-  const avatarUrl = profile?.avatar_google_file_id && !avatarUnavailable
+  // Skip the avatar request when an older photo still lives in this workspace's Drive and that Drive is disconnected.
+  const avatarUnavailable = profile?.avatar_url !== AVATAR_MARKER && !driveConnected && profile?.avatar_workspace_id === context.workspaceId;
+  const avatarUrl = hasAvatar(profile) && !avatarUnavailable
     ? "/api/profile/avatar?v=" + encodeURIComponent(profile.updated_at ?? "")
     : null;
 

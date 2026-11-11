@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
-import { getStorageForWorkspace } from "@/lib/storage/storage"
+import { AVATAR_MARKER, saveAvatar, sniffAvatarType } from "@/lib/avatar-storage"
 import { getWorkspaceContext } from "@/lib/workspace/server"
 import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -57,27 +57,22 @@ export async function uploadProfileAvatar(formData: FormData): Promise<void> {
 
   const context = await getWorkspaceContext()
   if (!context) actionFailure(returnPath, "access the active workspace")
-  const storage = getStorageForWorkspace(context.workspaceId)
+  // Trust the bytes, not the browser's claimed type.
+  const bytes = new Uint8Array(await value.arrayBuffer())
+  const type = sniffAvatarType(bytes)
+  if (!type) actionFailure(returnPath, "upload profile photo")
 
-  let uploaded: Awaited<ReturnType<typeof storage.upload>>
+  // Stored per account in Supabase Storage, so the photo no longer depends on any workspace's Google Drive.
   try {
-    const folderId = await storage.ensureFolder(["avatars"])
-    uploaded = await storage.upload({ name: context.user.id + "-avatar", mimeType: value.type, body: Buffer.from(await value.arrayBuffer()), sizeBytes: value.size, parentId: folderId })
+    await saveAvatar(context.user.id, bytes, type)
   } catch (error) {
-    actionFailure(returnPath, "upload profile photo", storageError(error))
+    actionFailure(returnPath, "upload profile photo", error instanceof Error ? error : null)
   }
+  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, avatar_url: AVATAR_MARKER, avatar_google_file_id: null, avatar_workspace_id: null, updated_at: new Date().toISOString() })
+  if (error) actionFailure(returnPath, "save profile photo", error)
 
-  const { error } = await context.supabase.from("profiles").upsert({ id: context.user.id, avatar_url: "google-drive:" + uploaded.id, avatar_google_file_id: uploaded.id, avatar_workspace_id: context.workspaceId, updated_at: new Date().toISOString() })
-  if (error) {
-    try {
-      await storage.delete(uploaded.id)
-    } catch {
-      console.error("Could not remove orphaned Google Drive avatar")
-    }
-    actionFailure(returnPath, "save profile photo", error)
-  }
-
-  // ponytail: old profile references are user-writable; reclaim orphan avatars only with trusted ownership metadata.
+  // ponytail: an older photo in a workspace's Google Drive is left in place; old profile references are user-writable, so it isn't deleted on their say-so.
+  revalidatePath("/", "layout")
   revalidatePath("/profile")
   revalidatePath("/settings")
   redirect(returnPath)

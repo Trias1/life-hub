@@ -1,3 +1,4 @@
+import { hasAvatar } from "@/lib/avatar-storage"
 import { getWorkspaceContext } from "@/lib/workspace/server"
 import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { ProfileStudio } from "@/components/profile-studio"
@@ -13,7 +14,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const googleConnected = await hasGoogleAccountConnection(user.id)
   const { data: profile } = await supabase.from("profiles").select("display_name,username,bio,avatar_url,avatar_google_file_id,updated_at").eq("id", user.id).maybeSingle()
   const profileView = profile ? { ...profile, bio: decryptField(FIELD.PROFILE_BIO, profile.bio) } : profile
-  const avatarUrl = profile?.avatar_google_file_id ? "/api/profile/avatar?v=" + encodeURIComponent(profile.updated_at ?? "") : null
+  const avatarUrl = hasAvatar(profile) ? "/api/profile/avatar?v=" + encodeURIComponent(profile.updated_at ?? "") : null
   const membership = { workspace_id: context.workspaceId }
   const [notes, tasks, files, logs] = membership ? await Promise.all([
     supabase.from("notes").select("title,updated_at").eq("workspace_id", membership.workspace_id).eq("author_id", user.id).order("updated_at", { ascending: false }).limit(2),

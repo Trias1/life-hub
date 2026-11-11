@@ -2,6 +2,7 @@ import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { notificationEnabled } from "@/lib/notification-preferences.mjs"
+import { hasAvatar } from "@/lib/avatar-storage"
 
 type WorkspaceMembership = { workspace_id: string; role: string }
 
@@ -98,20 +99,24 @@ export type MemberProfile = { name: string; email: string | null; avatarUrl: str
 
 /**
  * Names and photos of the active workspace's members. Profiles are readable only by their owner (RLS),
- * so this reads them with the service role, after checking each id is a member of the viewer's
- * active workspace: nobody outside the workspace can be looked up through it.
+ * so this reads them with the service role, for members of the viewer's active workspace only:
+ * nobody outside the workspace can be looked up through it.
  */
 export async function getMemberProfiles(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, userIds: string[]) {
+  const all = await loadWorkspaceProfiles(context.workspaceId)
+  return new Map([...new Set(userIds)].flatMap((id) => { const profile = all.get(id); return profile ? [[id, profile] as const] : [] }))
+}
+
+// Once per request and workspace (React cache), however many times a page asks for names.
+const loadWorkspaceProfiles = cache(async (workspaceId: string) => {
   const profiles = new Map<string, MemberProfile>()
-  const ids = [...new Set(userIds)]
-  if (!ids.length) return profiles
   const admin = createAdminClient()
-  const { data: members, error: membersError } = await admin.from("workspace_members").select("user_id").eq("workspace_id", context.workspaceId).in("user_id", ids)
+  const { data: members, error: membersError } = await admin.from("workspace_members").select("user_id").eq("workspace_id", workspaceId)
   if (membersError) return profiles
   const memberIds = (members ?? []).map((member) => member.user_id as string)
   if (!memberIds.length) return profiles
   const [{ data: rows }, users] = await Promise.all([
-    admin.from("profiles").select("id,display_name,avatar_google_file_id,updated_at").in("id", memberIds),
+    admin.from("profiles").select("id,display_name,avatar_url,avatar_google_file_id,updated_at").in("id", memberIds),
     Promise.all(memberIds.map((id) => admin.auth.admin.getUserById(id).then(({ data }) => data.user, () => null))),
   ])
   const rowsById = new Map((rows ?? []).map((row) => [row.id as string, row]))
@@ -122,8 +127,8 @@ export async function getMemberProfiles(context: NonNullable<Awaited<ReturnType<
     profiles.set(id, {
       name: row?.display_name?.trim() || email?.split("@")[0] || "Member " + id.slice(0, 8),
       email,
-      avatarUrl: row?.avatar_google_file_id ? "/api/profile/avatar?user=" + id + "&v=" + encodeURIComponent(row.updated_at ?? "") : null,
+      avatarUrl: hasAvatar(row) ? "/api/profile/avatar?user=" + id + "&v=" + encodeURIComponent(row.updated_at ?? "") : null,
     })
   }
   return profiles
-}
+})
