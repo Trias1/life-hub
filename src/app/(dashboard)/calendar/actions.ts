@@ -85,21 +85,28 @@ async function getEventContext(formData: FormData, operation: string) {
   return { context, event }
 }
 
+/** Sends the user back with a message that says what to fix, instead of a generic "could not". */
+function attendeeFailure(path: string, message: string): never {
+  console.error("add event attendee", message)
+  redirect(path + "?error=" + encodeURIComponent(message))
+}
+
 export async function addEventAttendee(formData: FormData): Promise<void> {
   const input = attendeeSchema.safeParse({ eventId: formData.get("eventId"), userId: formData.get("userId") || undefined, email: formData.get("email")?.toString().trim().toLowerCase() || undefined })
   const eventId = z.string().uuid().safeParse(formData.get("eventId"))
-  if (!input.success) actionFailure(eventId.success ? "/calendar/" + eventId.data : "/calendar", "add event attendee")
+  if (!input.success) attendeeFailure(eventId.success ? "/calendar/" + eventId.data : "/calendar", "Choose a workspace member or enter a valid email address.")
   const { context, event } = await getEventContext(formData, "add event attendee")
   const eventPath = "/calendar/" + event.id
-  if (event.creator_id !== context.user.id) actionFailure(eventPath, "add event attendee")
+  if (event.creator_id !== context.user.id) attendeeFailure(eventPath, "Only the person who created this event can add attendees.")
   if (input.data.userId) {
     const { data: member, error: memberError } = await context.supabase.from("workspace_members").select("user_id").eq("workspace_id", context.workspaceId).eq("user_id", input.data.userId).maybeSingle()
-    if (memberError || !member) actionFailure(eventPath, "add event attendee", memberError ?? new Error("Member not found"))
+    if (memberError) actionFailure(eventPath, "add event attendee", memberError)
+    if (!member) attendeeFailure(eventPath, "That person is not a member of this workspace.")
     const { data: existing } = await context.supabase.from("calendar_event_attendees").select("id").eq("event_id", event.id).eq("user_id", input.data.userId).maybeSingle()
-    if (existing) actionFailure(eventPath, "add event attendee", new Error("Attendee already added"))
+    if (existing) attendeeFailure(eventPath, "They are already on the attendee list.")
   } else if (input.data.email) {
     const { data: existing } = await context.supabase.from("calendar_event_attendees").select("id").eq("event_id", event.id).eq("email", input.data.email).maybeSingle()
-    if (existing) actionFailure(eventPath, "add event attendee", new Error("Attendee already added"))
+    if (existing) attendeeFailure(eventPath, "That email is already on the attendee list.")
   }
   const { error } = await context.supabase.from("calendar_event_attendees").insert({ event_id: event.id, user_id: input.data.userId ?? null, email: input.data.email ?? null })
   if (error) actionFailure(eventPath, "add event attendee", error)

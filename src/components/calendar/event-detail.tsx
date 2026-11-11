@@ -45,6 +45,10 @@ export function EventDetail({ event, state, canEdit, creatorName, createdAt, cre
   const [menuOpen, setMenuOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [showAllActivity, setShowAllActivity] = useState(false)
+  const [attendeeUserId, setAttendeeUserId] = useState("")
+  const [attendeeEmail, setAttendeeEmail] = useState("")
+  // Clear the picker once an attendee is added (the list grows and the chosen member leaves the options).
+  useEffect(() => { setAttendeeUserId(""); setAttendeeEmail("") }, [attendees.length])
   const menuRef = useRef<HTMLDivElement>(null)
   const shownActivity = showAllActivity ? activity : activity.slice(0, 5)
   const hiddenCount = activity.length - shownActivity.length
@@ -178,9 +182,10 @@ export function EventDetail({ event, state, canEdit, creatorName, createdAt, cre
           {canEdit && (
             <form action={actions.addEventAttendee} className="mt-3 grid gap-2">
               {hidden("eventId", event.id)}
-              <Select name="userId" defaultValue="" options={[{ value: "", label: "Invite workspace member" }, ...inviteOptions]} className="field-control" />
-              <input type="email" name="email" placeholder="Or external email" aria-label="External attendee email" className="field-control" />
-              <SubmitButton label="Add attendee" pendingLabel="Adding…" className="button-secondary min-h-0 px-3 py-1.5 text-sm" />
+              <Select name="userId" value={attendeeUserId} onChange={setAttendeeUserId} options={[{ value: "", label: "Invite workspace member" }, ...inviteOptions]} className="field-control" />
+              <input type="email" name="email" value={attendeeEmail} onChange={(changeEvent) => setAttendeeEmail(changeEvent.target.value)} placeholder="Or external email" aria-label="External attendee email" className="field-control" />
+              {/* Nothing chosen yet: the server would only answer with an error, so keep the button off. */}
+              <SubmitButton label="Add attendee" pendingLabel="Adding…" disabled={!attendeeUserId && !attendeeEmail.trim()} className="button-secondary min-h-0 px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50" />
             </form>
           )}
         </div>
