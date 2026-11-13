@@ -4,6 +4,8 @@ export function apiBucket(pathname) {
   if (path === "/api/search" || path === "/api/profile/avatar") return "search"
   if (path === "/api/notes/upload-image") return "upload"
   if (["/api/workspace/export", "/api/bookmarks/export"].includes(path)) return "export"
+  // Backup downloads (owner only), but not the hourly job, which has no user session.
+  if (path.startsWith("/api/backup/") && path !== "/api/backup/cron") return "export"
   if (path === "/api/bookmarks/fetch-meta") return "fetch-meta"
   if (path === "/api/auth/google/login" || path === "/api/auth/google/callback" || path === "/api/auth/google/account/login" || path === "/api/auth/google/account/callback") return "oauth"
   return null

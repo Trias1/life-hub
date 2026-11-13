@@ -8,11 +8,11 @@ import { accents, applyCustomizePreferences, defaultCustomizePreferences, readCu
 type Section = "general" | "appearance" | "workspace" | "notifications" | "security" | "integrations" | "backup" | "danger"
 type GeneralSettings = { language: string; timezone: string; dateFormat: string; timeFormat: string }
 type NotificationSettings = { mentionsEnabled: boolean; tasksEnabled: boolean; calendarEnabled: boolean; notesEnabled: boolean; filesEnabled: boolean; bookmarksEnabled: boolean }
-type Props = { workspace: { name: string; slug: string }; initialGeneral: GeneralSettings; initialNotifications: NotificationSettings; driveConnected: boolean; canManageDrive: boolean; canManageSettings: boolean; disconnectDrive: () => Promise<void>; saveGeneralSettings: (formData: FormData) => Promise<void>; saveNotificationPreferences: (formData: FormData) => Promise<void>; deleteWorkspace: (formData: FormData) => Promise<void> }
+type Props = { workspace: { name: string; slug: string }; initialGeneral: GeneralSettings; initialNotifications: NotificationSettings; driveConnected: boolean; canManageDrive: boolean; canManageSettings: boolean; disconnectDrive: () => Promise<void>; saveGeneralSettings: (formData: FormData) => Promise<void>; saveNotificationPreferences: (formData: FormData) => Promise<void>; backupPanel?: React.ReactNode; deleteWorkspace: (formData: FormData) => Promise<void> }
 const sections: Array<[Section, string, string]> = [["general", "General", "Language, date, and time"], ["appearance", "Appearance", "Theme and interface"], ["workspace", "Workspace", "Identity and members"], ["notifications", "Notifications", "Delivery preferences"], ["security", "Security", "Password and sessions"], ["integrations", "Integrations", "Connected services"], ["backup", "Backup", "Export and recovery"], ["danger", "Danger Zone", "Permanent actions"]]
 const notificationOptions: Array<[keyof NotificationSettings, string]> = [["mentionsEnabled", "Mentions"], ["tasksEnabled", "Tasks"], ["calendarEnabled", "Calendar"], ["notesEnabled", "Notes"], ["filesEnabled", "Files"], ["bookmarksEnabled", "Bookmarks"]]
 
-export function SettingsStudio({ workspace, initialGeneral, initialNotifications, driveConnected, canManageDrive, canManageSettings, disconnectDrive, saveGeneralSettings, saveNotificationPreferences, deleteWorkspace }: Props) {
+export function SettingsStudio({ workspace, initialGeneral, initialNotifications, driveConnected, canManageDrive, canManageSettings, disconnectDrive, saveGeneralSettings, saveNotificationPreferences, deleteWorkspace, backupPanel }: Props) {
   const [section, setSection] = useState<Section>("general")
   const [preferences, setPreferences] = useState(defaultCustomizePreferences)
   const [saved, setSaved] = useState("")
@@ -55,7 +55,7 @@ const content = section === "general" ? generalContent
   : section === "integrations" ? integrations
   : section === "notifications" ? notificationContent
   : section === "security" ? securityContent
-  : section === "backup" ? backupContent
+  : section === "backup" ? backupPanel ?? backupContent
   : section === "danger" ? <div className="space-y-5"><p className="text-sm leading-6 text-zinc-500">Destructive workspace actions remain separated from daily preferences.</p><a href="/api/workspace/export" className="inline-flex rounded-xl border border-red-500/40 px-3 py-2 text-sm font-semibold text-red-500">Export data</a>{canManageSettings && <form action={deleteWorkspace} className="rounded-2xl border border-red-500/30 p-4"><p className="font-semibold text-danger">Delete workspace</p><p className="mt-1 text-sm text-zinc-500">This permanently removes the workspace and its data. Export first if you need a copy.</p><label className="field-label mt-3">Type <strong className="font-mono">{workspace.name}</strong> to confirm<input name="confirmation" required autoComplete="off" spellCheck={false} value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} className="field-control" /></label><button disabled={deleteConfirm.trim() !== workspace.name} className="mt-3 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Delete workspace</button></form>}</div>
   : utility(active[1], active[2] + ".")
 

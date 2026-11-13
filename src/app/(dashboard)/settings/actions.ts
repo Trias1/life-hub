@@ -9,6 +9,8 @@ import { getWorkspaceContext } from "@/lib/workspace/server"
 import { FIELD, encryptField } from "@/lib/data-crypto.mjs"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { disconnectWorkspaceDriveConnection, disconnectGoogleAccount } from "@/lib/google-drive-auth"
+import { checkRequestLimit } from "@/lib/request-rate-limit.mjs"
+import { runWorkspaceBackup } from "@/lib/workspace-backup"
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(80),
@@ -143,4 +145,37 @@ export async function disconnectGoogleAccountAction(): Promise<void> {
   }
   revalidatePath("/profile")
   redirect("/profile?google=disconnected")
+}
+
+const backupScheduleSchema = z.object({
+  frequency: z.enum(["off", "daily", "weekly", "monthly"]),
+  hour: z.coerce.number().int().min(0).max(23),
+  weekday: z.coerce.number().int().min(0).max(6),
+  monthDay: z.coerce.number().int().min(1).max(28),
+  keepCount: z.coerce.number().int().refine((value) => [7, 14, 30].includes(value)),
+})
+
+/** Saves the automatic backup schedule (Settings > Backup). Workspace owner only; RLS checks it too (0040). */
+export async function saveBackupSchedule(formData: FormData): Promise<{ error?: string }> {
+  const input = backupScheduleSchema.safeParse({ frequency: formData.get("frequency"), hour: formData.get("hour"), weekday: formData.get("weekday"), monthDay: formData.get("monthDay"), keepCount: formData.get("keepCount") })
+  if (!input.success) return { error: "Choose a valid schedule." }
+  const context = await getWorkspaceContext()
+  if (!context) return { error: "Your session expired. Sign in again." }
+  if (context.role !== "super_admin") return { error: "Only the workspace owner can change backups." }
+  const { error } = await context.supabase.from("workspace_backup_settings").upsert({ workspace_id: context.workspaceId, frequency: input.data.frequency, hour: input.data.hour, weekday: input.data.weekday, month_day: input.data.monthDay, keep_count: input.data.keepCount, updated_by: context.user.id, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
+  if (error) return { error: "Couldn't save the backup schedule." }
+  revalidatePath("/settings")
+  return {}
+}
+
+/** Makes a backup now (owner only, 5 a minute like other exports). */
+export async function runBackupNow(): Promise<{ error?: string; fileName?: string }> {
+  const context = await getWorkspaceContext()
+  if (!context) return { error: "Your session expired. Sign in again." }
+  if (context.role !== "super_admin") return { error: "Only the workspace owner can make backups." }
+  const denied = await checkRequestLimit(context.supabase, "export")
+  if (denied) return { error: denied.status === 429 ? "Too many backups in a row. Wait a minute and try again." : "Couldn't check the request limit. Try again in a minute." }
+  const result = await runWorkspaceBackup(context.workspaceId, "manual", context.user.id)
+  revalidatePath("/settings")
+  return result.ok ? { fileName: result.fileName } : { error: result.error }
 }
