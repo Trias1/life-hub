@@ -26,8 +26,11 @@ test("old backups beyond the keep count are removed, and failures retry next hou
   assert.doesNotMatch(backup.slice(backup.indexOf("} catch (error) {")), /last_run_at:/, "a failure keeps the last run time, so it retries")
 })
 
-test("the hourly job needs the cron secret; downloads are owner only, from the backups folder", () => {
-  assert.match(cron, /if \(!isCronRequest\(request\)\) return NextResponse\.json\(\{ error: "Unauthorized" \}, \{ status: 401 \}\)/)
+test("the hourly job needs a one-time token (or the cron secret); downloads are owner only", () => {
+  assert.match(cron, /if \(!\(await isAuthorized\(request, admin\)\)\) return NextResponse\.json\(\{ error: "Unauthorized" \}, \{ status: 401 \}\)/)
+  assert.match(cron, /\.from\("cron_call_tokens"\)\.delete\(\)\.eq\("token", token\.data\)\.gte\("created_at", /, "a token is consumed on use and expires")
+  assert.match(cron, /\(data\?\.length \?\? 0\) === 1/)
+  assert.ok(cron.indexOf("isAuthorized(request, admin)") < cron.indexOf("workspace_backup_settings"), "nothing runs before the caller is checked")
   assert.match(cron, /export async function GET\(/)
   assert.doesNotMatch(cron, /export async function POST\(/)
   assert.match(download, /context\.role !== "super_admin"/)
