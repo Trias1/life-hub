@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
-import { Archive, Copy, History, MoreVertical, Pin, PinOff, RotateCcw, SquarePen, Trash2 } from "lucide-react"
+import { Archive, Copy, FileText, History, MoreVertical, PanelLeft, Pin, PinOff, RotateCcw, SquarePen, Trash2 } from "lucide-react"
 import { Select } from "@/components/ui/select"
 import { useImageUpload } from "@/hooks/use-image-upload"
 import { noteFolders } from "./note-content"
 import { NoteDescriptionEditor } from "./note-description-editor"
 import { NoteViewer } from "./note-viewer"
+import { NotePages, type PageNode } from "./note-pages"
+import { NoteToc, useNoteHeadings } from "./note-toc"
 import { TagChip } from "./tag-chip"
 
 type Note = { id: string; title: string; content: string; folder: string; tags: string[]; is_favorite: boolean; archived_at: string | null; deleted_at: string | null }
@@ -26,14 +28,20 @@ type Props = {
   createdAt: string
   createdIso: string
   updatedLabel: string
-  actions: { updateNote: EditAction; restoreNoteVersion: EditAction; archiveNote: FormAction; trashNote: FormAction; restoreNote: FormAction; deleteNotePermanently: FormAction; toggleFavorite: FormAction }
+  /** The page tree around this note (empty when the note is archived or in the trash). */
+  pages: PageNode[]
+  parent: { id: string; title: string } | null
+  subPages: { id: string; title: string }[]
+  /** Your own active notes this one can move under (never itself or its own sub-pages). */
+  parentOptions: { value: string; label: string }[]
+  actions: { updateNote: EditAction; restoreNoteVersion: EditAction; archiveNote: FormAction; trashNote: FormAction; restoreNote: FormAction; deleteNotePermanently: FormAction; toggleFavorite: FormAction; createNote: FormAction }
 }
 
-export function NoteDetail({ note, versions, workspaceId, folders, canEdit, authorName, createdLabel, createdAt, createdIso, updatedLabel, actions }: Props) {
+export function NoteDetail({ note, versions, workspaceId, folders, canEdit, authorName, createdLabel, createdAt, createdIso, updatedLabel, pages, parent, subPages, parentOptions, actions }: Props) {
   const router = useRouter()
   const { processImages } = useImageUpload()
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState({ title: note.title, content: note.content, folder: note.folder, tags: note.tags.join(", ") })
+  const [draft, setDraft] = useState({ title: note.title, content: note.content, folder: note.folder, tags: note.tags.join(", "), parentId: parent?.id ?? "" })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
   const [menuOpen, setMenuOpen] = useState(false)
@@ -43,6 +51,12 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
   const menuRef = useRef<HTMLDivElement>(null)
   const state = note.deleted_at ? "trash" : note.archived_at ? "archived" : "active"
   const folderOptions = Array.from(new Set([...noteFolders, ...folders, note.folder])).map((value) => ({ value, label: value }))
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const { headings, activeIndex } = useNoteHeadings(bodyRef, !editing)
+  const [pagesOpen, setPagesOpen] = useState(false)
+  const tocRef = useRef<HTMLDetailsElement>(null)
+  const showPages = state === "active" && (pages.length > 1 || canEdit)
+  const pagesPanel = <NotePages pages={pages} currentId={note.id} canAdd={canEdit && state === "active"} addSubPage={actions.createNote} />
 
   useEffect(() => {
     if (!menuOpen) return
@@ -54,7 +68,7 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
   }, [menuOpen])
 
   function startEditing() {
-    setDraft({ title: note.title, content: note.content, folder: note.folder, tags: note.tags.join(", ") })
+    setDraft({ title: note.title, content: note.content, folder: note.folder, tags: note.tags.join(", "), parentId: parent?.id ?? "" })
     setMessage("")
     setEditing(true)
   }
@@ -70,6 +84,7 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
       formData.set("content", await processImages(draft.content, workspaceId))
       formData.set("folder", draft.folder)
       formData.set("tags", draft.tags)
+      formData.set("parentId", draft.parentId)
       const result = await actions.updateNote(formData)
       if (result.error) return setMessage(result.error)
       setEditing(false)
@@ -101,106 +116,145 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
   const hidden = (name: string, value: string) => <input type="hidden" name={name} value={value} />
 
   return (
-    <div className="issue-layout issue-detail">
-      <article className="issue-main min-w-0">
-        {state !== "active" && (
-          <div role="status" className="issue-banner">
-            <span>{state === "archived" ? "This note is archived. It is hidden from the active list." : "This note is in the trash."}</span>
-            {canEdit && (
-              <span className="flex gap-2">
-                <form action={actions.restoreNote}>{hidden("id", note.id)}{hidden("from", state)}<button className="button-secondary min-h-0 px-3 py-1.5 text-xs"><RotateCcw size={13} className="mr-1.5" />Restore</button></form>
-                {state === "trash" && <form action={actions.deleteNotePermanently} onSubmit={(event) => { if (!window.confirm("Delete this note permanently? This cannot be undone.")) event.preventDefault() }}>{hidden("id", note.id)}<button className="button-quiet min-h-0 px-3 py-1.5 text-xs text-danger">Delete permanently</button></form>}
-              </span>
-            )}
+    <div className={"note-shell" + (showPages ? " has-pages" : "")}>
+      {showPages && <aside className="note-pages">{pagesPanel}</aside>}
+      <div className="min-w-0">
+        {showPages && (
+          <div className="note-pages-mobile">
+            <button type="button" onClick={() => setPagesOpen((open) => !open)} aria-expanded={pagesOpen} className="button-secondary min-h-0 px-3 py-1.5 text-sm"><PanelLeft size={15} className="mr-1.5" aria-hidden />Pages</button>
+            {pagesOpen && <div className="mt-3">{pagesPanel}</div>}
           </div>
         )}
+        <div className="issue-layout issue-detail">
+          <article className="issue-main min-w-0">
+            {state !== "active" && (
+              <div role="status" className="issue-banner">
+                <span>{state === "archived" ? "This note is archived. It is hidden from the active list." : "This note is in the trash."}</span>
+                {canEdit && (
+                  <span className="flex gap-2">
+                    <form action={actions.restoreNote}>{hidden("id", note.id)}{hidden("from", state)}<button className="button-secondary min-h-0 px-3 py-1.5 text-xs"><RotateCcw size={13} className="mr-1.5" />Restore</button></form>
+                    {state === "trash" && <form action={actions.deleteNotePermanently} onSubmit={(event) => { if (!window.confirm("Delete this note permanently? This cannot be undone.")) event.preventDefault() }}>{hidden("id", note.id)}<button className="button-quiet min-h-0 px-3 py-1.5 text-xs text-danger">Delete permanently</button></form>}
+                  </span>
+                )}
+              </div>
+            )}
 
-        {editing ? (
-          <div className="issue-form">
-            <div className="issue-form-field">
-              <label htmlFor="edit-note-title" className="issue-form-label">Title <span className="font-normal text-[var(--muted)]">(required)</span></label>
-              <input id="edit-note-title" autoFocus maxLength={160} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="field-control" />
-            </div>
-            <div className="issue-form-field">
-              <p id="edit-note-description" className="issue-form-label">Description</p>
-              <NoteDescriptionEditor value={draft.content} onChange={(content) => setDraft((current) => ({ ...current, content }))} minHeight={240} labelledBy="edit-note-description" />
-            </div>
-            <div className="issue-form-actions">
-              <button type="button" onClick={() => void save()} disabled={saving} className="button-primary disabled:opacity-60">{saving ? "Saving…" : "Save changes"}</button>
-              <button type="button" onClick={() => { setEditing(false); setMessage("") }} disabled={saving} className="button-secondary">Cancel</button>
-              <span role="status" className="text-xs text-[var(--muted)]">{message}</span>
-            </div>
-          </div>
-        ) : (
-          <>
-            <header className="issue-header">
-              <h1 className="issue-title">{note.title}</h1>
-              <div className="flex shrink-0 items-center gap-2">
-                {canEdit && state === "active" && <button type="button" onClick={startEditing} className="button-secondary min-h-0 px-3 py-1.5">Edit</button>}
-                <div ref={menuRef} className="relative">
-                  <button type="button" aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)} className="button-quiet min-h-0 px-2 py-1.5"><MoreVertical size={16} /></button>
-                  {menuOpen && (
-                    <div role="menu" className="issue-menu">
-                      <button type="button" role="menuitem" onClick={() => void copyLink()}><Copy size={14} />Copy link</button>
-                      {canEdit && state === "active" && <>
-                        <form action={actions.toggleFavorite} onSubmit={() => setMenuOpen(false)}>{hidden("id", note.id)}{hidden("favorite", note.is_favorite ? "false" : "true")}<button role="menuitem">{note.is_favorite ? <PinOff size={14} /> : <Pin size={14} />}{note.is_favorite ? "Unpin" : "Pin to top"}</button></form>
-                        <form action={actions.archiveNote}>{hidden("id", note.id)}<button role="menuitem"><Archive size={14} />Archive</button></form>
-                        <form action={actions.trashNote}>{hidden("id", note.id)}<button role="menuitem" className="text-danger"><Trash2 size={14} />Move to trash</button></form>
-                      </>}
-                    </div>
-                  )}
+            {editing ? (
+              <div className="issue-form">
+                <div className="issue-form-field">
+                  <label htmlFor="edit-note-title" className="issue-form-label">Title <span className="font-normal text-[var(--muted)]">(required)</span></label>
+                  <input id="edit-note-title" autoFocus maxLength={160} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="field-control" />
+                </div>
+                <div className="issue-form-field">
+                  <p id="edit-note-description" className="issue-form-label">Description</p>
+                  <NoteDescriptionEditor value={draft.content} onChange={(content) => setDraft((current) => ({ ...current, content }))} minHeight={240} labelledBy="edit-note-description" />
+                </div>
+                <div className="issue-form-actions">
+                  <button type="button" onClick={() => void save()} disabled={saving} className="button-primary disabled:opacity-60">{saving ? "Saving…" : "Save changes"}</button>
+                  <button type="button" onClick={() => { setEditing(false); setMessage("") }} disabled={saving} className="button-secondary">Cancel</button>
+                  <span role="status" className="text-xs text-[var(--muted)]">{message}</span>
                 </div>
               </div>
-            </header>
-            <p className="issue-meta">
-              <span className="issue-state" data-state={state}>{state === "active" ? "Active" : state === "archived" ? "Archived" : "Trash"}</span>
-              <SquarePen size={14} aria-hidden />
-              <span>Note created <time dateTime={createdIso} title={createdAt}>{createdLabel}</time> by <strong>{authorName}</strong></span>
-            </p>
-            {message && <p role="status" className="mt-3 text-xs text-[var(--muted)]">{message}</p>}
-            <div className="issue-body"><NoteViewer content={note.content} accountCards /></div>
-          </>
-        )}
+            ) : (
+              <>
+                <header className="issue-header">
+                  <h1 className="issue-title">{note.title}</h1>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {canEdit && state === "active" && <button type="button" onClick={startEditing} className="button-secondary min-h-0 px-3 py-1.5">Edit</button>}
+                    <div ref={menuRef} className="relative">
+                      <button type="button" aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)} className="button-quiet min-h-0 px-2 py-1.5"><MoreVertical size={16} /></button>
+                      {menuOpen && (
+                        <div role="menu" className="issue-menu">
+                          <button type="button" role="menuitem" onClick={() => void copyLink()}><Copy size={14} />Copy link</button>
+                          {canEdit && state === "active" && <>
+                            <form action={actions.toggleFavorite} onSubmit={() => setMenuOpen(false)}>{hidden("id", note.id)}{hidden("favorite", note.is_favorite ? "false" : "true")}<button role="menuitem">{note.is_favorite ? <PinOff size={14} /> : <Pin size={14} />}{note.is_favorite ? "Unpin" : "Pin to top"}</button></form>
+                            <form action={actions.archiveNote}>{hidden("id", note.id)}<button role="menuitem"><Archive size={14} />Archive</button></form>
+                            <form action={actions.trashNote}>{hidden("id", note.id)}<button role="menuitem" className="text-danger"><Trash2 size={14} />Move to trash</button></form>
+                          </>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </header>
+                <p className="issue-meta">
+                  <span className="issue-state" data-state={state}>{state === "active" ? "Active" : state === "archived" ? "Archived" : "Trash"}</span>
+                  <SquarePen size={14} aria-hidden />
+                  <span>Note created <time dateTime={createdIso} title={createdAt}>{createdLabel}</time> by <strong>{authorName}</strong></span>
+                </p>
+                {message && <p role="status" className="mt-3 text-xs text-[var(--muted)]">{message}</p>}
+                {headings.length > 1 && (
+                  <details ref={tocRef} className="note-toc-inline">
+                    <summary>On this page</summary>
+                    <NoteToc headings={headings} activeIndex={activeIndex} onSelect={() => tocRef.current?.removeAttribute("open")} />
+                  </details>
+                )}
+                <div ref={bodyRef} className="issue-body"><NoteViewer content={note.content} accountCards /></div>
+                {subPages.length > 0 && (
+                  <section className="note-subpages-section" aria-labelledby="subpages-heading">
+                    <h2 id="subpages-heading" className="issue-section-title">Sub-pages</h2>
+                    <ul className="note-subpages">
+                      {subPages.map((page) => <li key={page.id}><Link href={"/notes/" + page.id} className="note-subpage"><FileText size={15} aria-hidden />{page.title}</Link></li>)}
+                    </ul>
+                  </section>
+                )}
+              </>
+            )}
 
 
-      </article>
+          </article>
 
-      <aside className="issue-sidebar">
-        <div className="issue-sidebar-block">
-          <p className="issue-sidebar-label">Folder</p>
-          {editing ? <Select value={draft.folder} onChange={(folder) => setDraft({ ...draft, folder })} options={folderOptions} className="field-control mt-2" /> : <p className="mt-1.5 text-sm">{note.folder}</p>}
-        </div>
-        <div className="issue-sidebar-block">
-          <p className="issue-sidebar-label">Labels</p>
-          {editing ? <><input value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} placeholder="design, planning" aria-label="Labels" className="field-control mt-2" /><p className="mt-1.5 text-xs text-[var(--muted)]">Separate labels with commas.</p></>
-            : note.tags.length ? <div className="mt-2 flex flex-wrap gap-1.5">{note.tags.map((tag) => <Link key={tag} href={"/notes?label=" + encodeURIComponent(tag)}><TagChip tag={tag} /></Link>)}</div> : <p className="mt-1.5 text-sm text-[var(--muted)]">None</p>}
-        </div>
-        <div className="issue-sidebar-block">
-          <p className="issue-sidebar-label">Pinned</p>
-          <p className="mt-1.5 text-sm">{note.is_favorite ? "Yes" : "No"}</p>
-        </div>
-        <div className="issue-sidebar-block">
-          <p className="issue-sidebar-label">Last updated</p>
-          <p className="mt-1.5 text-sm">{updatedLabel}</p>
-        </div>
-      </aside>
-      <section className="issue-activity" aria-labelledby="activity-heading">
-        <h2 id="activity-heading" className="issue-section-title">Activity</h2>
-        <ol className="issue-timeline">
-          {shownVersions.map((version) => (
-            <li key={version.id}>
-              <History size={14} aria-hidden />
-              <div className="issue-timeline-text">
-                <p><strong>{authorName}</strong> edited this note · <time dateTime={version.createdIso} title={version.createdAt}>{version.createdLabel}</time></p>
-                {version.title !== note.title && <p className="issue-timeline-detail">Title was “{version.title}”</p>}
+          <aside className="issue-sidebar">
+            {!editing && headings.length > 1 && (
+              <nav className="issue-sidebar-block note-toc-block" aria-label="On this page">
+                <p className="issue-sidebar-label">On this page</p>
+                <NoteToc headings={headings} activeIndex={activeIndex} />
+              </nav>
+            )}
+            {(parent || editing) && (
+              <div className="issue-sidebar-block">
+                <p className="issue-sidebar-label">Parent</p>
+                {editing
+                  ? <><Select value={draft.parentId} onChange={(parentId) => setDraft({ ...draft, parentId })} options={[{ value: "", label: "None (top level)" }, ...parentOptions]} className="field-control mt-2" /><p className="mt-1.5 text-xs text-[var(--muted)]">Move this note under another note.</p></>
+                  : parent && <p className="mt-1.5 text-sm"><Link href={"/notes/" + parent.id} className="hover:underline">{parent.title}</Link></p>}
               </div>
-              {canEdit && state === "active" && <button type="button" onClick={() => void restoreVersion(version)} className="issue-timeline-action">Restore</button>}
-            </li>
-          ))}
-          {hiddenCount > 0 && <li><button type="button" onClick={() => setShowAllActivity(true)} className="issue-timeline-more">Show {hiddenCount} older {hiddenCount === 1 ? "edit" : "edits"}</button></li>}
-          <li><SquarePen size={14} aria-hidden /><div className="issue-timeline-text"><p><strong>{authorName}</strong> created this note · <time dateTime={createdIso} title={createdAt}>{createdLabel}</time></p></div></li>
-        </ol>
-      </section>
+            )}
+            <div className="issue-sidebar-block">
+              <p className="issue-sidebar-label">Folder</p>
+              {editing ? <Select value={draft.folder} onChange={(folder) => setDraft({ ...draft, folder })} options={folderOptions} className="field-control mt-2" /> : <p className="mt-1.5 text-sm">{note.folder}</p>}
+            </div>
+            <div className="issue-sidebar-block">
+              <p className="issue-sidebar-label">Labels</p>
+              {editing ? <><input value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} placeholder="design, planning" aria-label="Labels" className="field-control mt-2" /><p className="mt-1.5 text-xs text-[var(--muted)]">Separate labels with commas.</p></>
+                : note.tags.length ? <div className="mt-2 flex flex-wrap gap-1.5">{note.tags.map((tag) => <Link key={tag} href={"/notes?label=" + encodeURIComponent(tag)}><TagChip tag={tag} /></Link>)}</div> : <p className="mt-1.5 text-sm text-[var(--muted)]">None</p>}
+            </div>
+            <div className="issue-sidebar-block">
+              <p className="issue-sidebar-label">Pinned</p>
+              <p className="mt-1.5 text-sm">{note.is_favorite ? "Yes" : "No"}</p>
+            </div>
+            <div className="issue-sidebar-block">
+              <p className="issue-sidebar-label">Last updated</p>
+              <p className="mt-1.5 text-sm">{updatedLabel}</p>
+            </div>
+          </aside>
+          <section className="issue-activity" aria-labelledby="activity-heading">
+            <h2 id="activity-heading" className="issue-section-title">Activity</h2>
+            <ol className="issue-timeline">
+              {shownVersions.map((version) => (
+                <li key={version.id}>
+                  <History size={14} aria-hidden />
+                  <div className="issue-timeline-text">
+                    <p><strong>{authorName}</strong> edited this note · <time dateTime={version.createdIso} title={version.createdAt}>{version.createdLabel}</time></p>
+                    {version.title !== note.title && <p className="issue-timeline-detail">Title was “{version.title}”</p>}
+                  </div>
+                  {canEdit && state === "active" && <button type="button" onClick={() => void restoreVersion(version)} className="issue-timeline-action">Restore</button>}
+                </li>
+              ))}
+              {hiddenCount > 0 && <li><button type="button" onClick={() => setShowAllActivity(true)} className="issue-timeline-more">Show {hiddenCount} older {hiddenCount === 1 ? "edit" : "edits"}</button></li>}
+              <li><SquarePen size={14} aria-hidden /><div className="issue-timeline-text"><p><strong>{authorName}</strong> created this note · <time dateTime={createdIso} title={createdAt}>{createdLabel}</time></p></div></li>
+            </ol>
+          </section>
+        </div>
+      </div>
     </div>
   )
 }

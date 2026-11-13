@@ -1,8 +1,10 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Pin, Search, SquarePen } from "lucide-react"
+import { Search } from "lucide-react"
 import { Select } from "@/components/ui/select"
 import { TagChip } from "@/components/notes/tag-chip"
+import { NoteList, type NoteListRow } from "@/components/notes/note-list"
+import { childrenByParent, flattenTree } from "@/lib/note-tree.mjs"
 import { relativeTime } from "@/lib/relative-time"
 import { getWorkspaceContext } from "@/lib/workspace/server"
 
@@ -32,7 +34,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     return query
   }
 
-  let notesQuery = supabase.from("notes").select("id,title,folder,tags,is_favorite,created_at,updated_at").eq("workspace_id", context.workspaceId)
+  let notesQuery = supabase.from("notes").select("id,title,folder,tags,is_favorite,parent_id,created_at,updated_at").eq("workspace_id", context.workspaceId)
   if (view === "active") notesQuery = notesQuery.is("deleted_at", null).is("archived_at", null)
   if (view === "archived") notesQuery = notesQuery.is("deleted_at", null).not("archived_at", "is", null)
   if (view === "trash") notesQuery = notesQuery.not("deleted_at", "is", null)
@@ -46,18 +48,14 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     scoped("active"),
     scoped("archived"),
     scoped("trash"),
-    supabase.from("notes").select("folder").eq("workspace_id", context.workspaceId).is("deleted_at", null),
+    supabase.from("notes").select("id,title,folder").eq("workspace_id", context.workspaceId).is("deleted_at", null),
   ])
   const counts = { active: activeCount.count ?? 0, archived: archivedCount.count ?? 0, trash: trashCount.count ?? 0 }
   // Pinned notes float to the top within the chosen sort, like pinned issues.
   const ordered = [...(notes ?? [])].sort((a, b) => Number(b.is_favorite) - Number(a.is_favorite))
-  const totalPages = Math.max(1, Math.ceil(ordered.length / PER_PAGE))
-  const page = Math.min(totalPages, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1))
-  const pageNotes = ordered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const folders = Array.from(new Set((folderRows ?? []).map((row) => row.folder))).sort()
   const now = new Date()
   const filtered = Boolean(q || label || folder)
-
   const href = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams()
     const merged = { view: view === "active" ? undefined : view, q: q || undefined, label: label || undefined, folder: folder || undefined, sort: sort === "updated" ? undefined : sort, ...changes }
@@ -65,6 +63,35 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     const query = next.toString()
     return "/notes" + (query ? "?" + query : "")
   }
+
+  // Active notes without a filter show as a tree (pages with their sub-pages); searches, filters,
+  // the archive and the trash stay a flat list, with "in <parent>" so a sub-page is still findable.
+  const asTree = view === "active" && !filtered
+  const titles = new Map((folderRows ?? []).map((row) => [row.id, row.title]))
+  const roots = asTree ? childrenByParent(ordered).get(null) ?? [] : ordered
+  const totalPages = Math.max(1, Math.ceil(roots.length / PER_PAGE))
+  const page = Math.min(totalPages, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1))
+  const pageRoots = new Set(roots.slice((page - 1) * PER_PAGE, page * PER_PAGE).map((note) => note.id))
+  const shown = asTree
+    ? flattenTree(ordered).filter((_, index, all) => { let top = index; while (all[top].depth) top--; return pageRoots.has(all[top].id) })
+    : ordered.filter((note) => pageRoots.has(note.id)).map((note) => ({ ...note, depth: 0, childCount: 0 }))
+  const listRows: NoteListRow[] = shown.map((note) => ({
+    id: note.id,
+    title: note.title,
+    folder: note.folder,
+    isFavorite: note.is_favorite,
+    createdLabel: relativeTime(note.created_at, now),
+    updatedLabel: relativeTime(note.updated_at, now),
+    depth: note.depth,
+    childCount: note.childCount,
+    parentTitle: !asTree && note.parent_id ? titles.get(note.parent_id) : undefined,
+    tags: (note.tags ?? []).length > 0 && (
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {(note.tags ?? []).map((tag: string) => <Link key={tag} href={href({ label: tag, page: undefined })}><TagChip tag={tag} /></Link>)}
+      </div>
+    ),
+  }))
+
 
   return (
     <div className="page-container">
@@ -109,27 +136,8 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
         </p>
       )}
 
-      {pageNotes.length ? (
-        <ul className="issue-list">
-          {pageNotes.map((note) => (
-            <li key={note.id} className="issue-row">
-              <SquarePen size={16} className="issue-row-icon" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <Link href={"/notes/" + note.id} className="issue-row-title">{note.title}</Link>
-                <p className="issue-row-meta">{note.folder} · created {relativeTime(note.created_at, now)}</p>
-                {(note.tags ?? []).length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {(note.tags ?? []).map((tag: string) => <Link key={tag} href={href({ label: tag, page: undefined })}><TagChip tag={tag} /></Link>)}
-                  </div>
-                )}
-              </div>
-              <div className="issue-row-side">
-                {note.is_favorite && <span className="issue-pin" title="Pinned"><Pin size={13} aria-hidden /><span className="sr-only">Pinned</span></span>}
-                <span>updated {relativeTime(note.updated_at, now)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+      {listRows.length ? (
+        <NoteList rows={listRows} />
       ) : (
         <div className="issue-empty">
           <h2>{filtered ? "No notes match these filters" : view === "active" ? "No notes yet" : view === "archived" ? "Nothing archived" : "Trash is empty"}</h2>

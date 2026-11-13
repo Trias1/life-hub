@@ -1846,3 +1846,62 @@ html[data-theme="light"] .auth-alert[data-tone="success"] { color: #047857; }
 .auth-footer a { font-weight: 600; color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
 .auth-sent { display: flex; gap: 0.85rem; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 1rem; color: var(--foreground); }
 .auth-sent > svg { flex-shrink: 0; margin-top: 0.1rem; color: #047857; }
+
+/* Note sub-pages: Pages panel, table of contents, sub-page cards, nested list rows */
+.note-shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; margin-top: 1.25rem; }
+.note-pages { display: none; }
+@media (min-width: 1280px) {
+  .note-shell.has-pages { grid-template-columns: 14rem minmax(0, 1fr); gap: 2rem; }
+  .note-pages { display: block; align-self: start; position: sticky; top: 1.5rem; max-height: calc(100vh - 3rem); overflow-y: auto; }
+  .note-pages-mobile { display: none; }
+}
+.note-pages-mobile { margin-bottom: 1rem; }
+.note-pages-panel { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); padding: 0.75rem; }
+.note-pages-label { padding: 0 0.4rem 0.4rem; font-size: 0.8rem; font-weight: 600; color: var(--foreground); }
+.note-tree { list-style: none; margin: 0; padding: 0; font-size: 0.875rem; }
+.note-tree .note-tree { margin-left: 0.7rem; padding-left: 0.45rem; border-left: 1px solid var(--line); }
+.note-tree-row { display: flex; align-items: center; gap: 0.15rem; border-radius: 0.55rem; }
+.note-tree-row:hover, .note-tree-row[data-current] { background: var(--surface-muted); }
+.note-tree-row[data-current] .note-tree-link { color: var(--foreground); font-weight: 600; }
+.note-tree-twist { display: grid; place-items: center; width: 1.4rem; height: 1.75rem; flex-shrink: 0; border-radius: 0.35rem; color: var(--muted); }
+button.note-tree-twist:hover { color: var(--foreground); }
+.note-tree-twist svg, .issue-row-twist svg { transition: transform 0.15s; }
+.note-tree-twist[aria-expanded="false"] svg, .issue-row-twist[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.note-tree-link { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0.3rem 0.4rem 0.3rem 0; color: var(--muted); }
+.note-tree-link:hover { color: var(--foreground); }
+.note-tree-count { padding-right: 0.5rem; font-size: 0.72rem; color: var(--muted); }
+.note-tree-add { display: flex; width: 100%; align-items: center; gap: 0.45rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding: 0.6rem 0.4rem 0.1rem; font-size: 0.85rem; color: var(--muted); }
+.note-tree-add:hover { color: var(--foreground); }
+.note-tree-form { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+.note-tree-form .field-control { min-width: 0; }
+
+.note-toc { list-style: none; margin: 0.5rem 0 0; padding: 0; border-left: 1px solid var(--line); font-size: 0.82rem; }
+.note-toc button { display: block; width: 100%; margin-left: -1px; border-left: 2px solid transparent; padding: 0.25rem 0.65rem; text-align: left; line-height: 1.4; color: var(--muted); }
+.note-toc button:hover { color: var(--foreground); }
+.note-toc button[data-depth="1"] { padding-left: 1.35rem; }
+.note-toc button[data-depth="2"] { padding-left: 2rem; }
+.note-toc button.is-active { border-left-color: var(--foreground); color: var(--foreground); font-weight: 600; }
+.note-toc-inline { display: none; margin-top: 1rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); padding: 0.6rem 0.9rem; }
+.note-toc-inline summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+@media (max-width: 1023px) { .note-toc-inline { display: block; } .note-toc-block { display: none; } }
+@media (min-width: 1024px) { .note-toc-block { max-height: 50vh; overflow-y: auto; } }
+.note-prose h1, .note-prose h2, .note-prose h3 { scroll-margin-top: 1.5rem; }
+@media (max-width: 767px) { .note-prose h1, .note-prose h2, .note-prose h3 { scroll-margin-top: 4.5rem; } }
+
+.note-subpages-section { margin-top: 1.5rem; }
+.note-subpages { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.6rem; margin-top: 0.75rem; max-width: 75ch; list-style: none; padding: 0; }
+.note-subpage { display: flex; align-items: center; gap: 0.55rem; height: 100%; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); padding: 0.65rem 0.8rem; font-size: 0.9rem; font-weight: 600; overflow-wrap: anywhere; }
+.note-subpage:hover { background: var(--surface-muted); }
+.note-subpage svg { flex-shrink: 0; color: var(--muted); }
+
+.issue-row[data-depth="1"] { padding-left: 1.75rem; }
+.issue-row[data-depth="2"] { padding-left: 3.25rem; }
+.issue-row[data-depth="3"], .issue-row[data-depth="4"] { padding-left: 4.75rem; }
+@media (max-width: 639px) {
+  .issue-row[data-depth="1"] { padding-left: 1rem; }
+  .issue-row[data-depth="2"] { padding-left: 1.75rem; }
+  .issue-row[data-depth="3"], .issue-row[data-depth="4"] { padding-left: 2.5rem; }
+}
+.issue-row-twist { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; flex-shrink: 0; border-radius: 0.3rem; color: var(--muted); }
+.issue-row-twist:hover { background: var(--surface-muted); color: var(--foreground); }
+.issue-row-spacer { width: 1.25rem; flex-shrink: 0; }
