@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
+import { friendlyPasswordError, passwordProblem } from "@/lib/password-rules.mjs"
 import { createClient } from "@/lib/supabase/server"
 
 // Current password only needs to be non-empty: accounts created before the 8-character minimum must still be able to change it.
-const schema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128), confirmPassword: z.string() }).refine((value) => value.newPassword === value.confirmPassword, { path: ["confirmPassword"] })
+const schema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().max(128).refine((value) => !passwordProblem(value)), confirmPassword: z.string() }).refine((value) => value.newPassword === value.confirmPassword, { path: ["confirmPassword"] })
 
 function fail(message: string): never { redirect("/security?error=" + encodeURIComponent(message)) }
 
 export async function updatePassword(formData: FormData): Promise<void> {
   const input = schema.safeParse({ currentPassword: formData.get("currentPassword"), newPassword: formData.get("newPassword"), confirmPassword: formData.get("confirmPassword") })
-  if (!input.success) fail("Use a valid current password and matching new password of at least 8 characters.")
+  if (!input.success) fail(passwordProblem(String(formData.get("newPassword") ?? "")) ?? "Enter your current password, and type the new password the same way twice.")
   if (input.data.newPassword === input.data.currentPassword) fail("Choose a new password that is different from the current one.")
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -27,7 +28,7 @@ export async function updatePassword(formData: FormData): Promise<void> {
   if (verifyError && /captcha/i.test(verifyError.message)) fail("The security check didn't pass. Wait a moment and try again.")
   if (verifyError) fail("Your current password is incorrect.")
   const { error } = await supabase.auth.updateUser({ password: input.data.newPassword })
-  if (error) fail("Could not update your password. Please try again.")
+  if (error) fail(friendlyPasswordError(error.message) ?? "Could not update your password. Please try again.")
   // End every other session, so a stolen cookie stops working after a password change.
   await supabase.auth.signOut({ scope: "others" })
   revalidatePath("/security")

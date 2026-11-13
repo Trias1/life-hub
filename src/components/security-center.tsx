@@ -2,6 +2,7 @@
 
 import { formatDateTime } from "@/lib/format-date"
 import { passwordStrength } from "@/lib/password-strength"
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/password-rules.mjs"
 import { Turnstile, type TurnstileHandle } from "@/components/auth/turnstile"
 import { TwoFactorSettings } from "@/components/security/two-factor-settings"
 
@@ -33,18 +34,18 @@ export function SecurityCenter({ email, lastSignIn, updatePassword, signOut, sig
   const currentSession = <article className="profile-session"><Laptop className="text-[var(--accent)]" /><div className="min-w-0 flex-1"><p className="font-semibold">Current browser</p><p className="mt-1 truncate text-sm text-zinc-500">Signed in as {email}{lastSignIn ? " · since " + formatDateTime(lastSignIn) : ""}</p></div><span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-600">Current</span></article>
   const content = section === "password" ? (
     <form action={updatePassword} className="space-y-5">
-      <div><p className="text-lg font-semibold">Change password</p><p className="mt-1 text-sm text-zinc-500">Use at least 8 characters and keep it unique to Sanctum Cove. Other sessions are signed out after the change.</p></div>
+      <div><p className="text-lg font-semibold">Change password</p><p className="mt-1 text-sm text-zinc-500">{PASSWORD_HINT}, unique to Sanctum Cove. Other sessions are signed out after the change.</p></div>
       {/* Lets password managers attach the new password to the right account. */}
       <input type="text" name="username" autoComplete="username" value={email} readOnly hidden />
       <label className="field-label">Current password<input required name="currentPassword" autoComplete="current-password" type={inputType} className="field-control" /></label>
       <label className="field-label">New password
         <span className="relative block">
-          <input required minLength={8} maxLength={128} name="newPassword" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} type={inputType} aria-describedby={strength ? "security-strength" : undefined} className="field-control w-full pr-12" />
+          <input required minLength={PASSWORD_MIN_LENGTH} maxLength={128} name="newPassword" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} type={inputType} aria-describedby={strength ? "security-strength" : undefined} className="field-control w-full pr-12" />
           <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-0.5 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded text-[var(--muted)] hover:text-[var(--foreground)]" aria-label={showPassword ? "Hide passwords" : "Show passwords"} aria-pressed={showPassword}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
         </span>
       </label>
       {strength && <p id="security-strength" className="auth-strength" data-tone={strength.tone} aria-live="polite"><span aria-hidden /> {strength.label}</p>}
-      <label className="field-label">Confirm new password<input required minLength={8} maxLength={128} name="confirmPassword" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} type={inputType} aria-invalid={mismatch || undefined} aria-describedby={mismatch ? "security-mismatch" : undefined} className="field-control" /></label>
+      <label className="field-label">Confirm new password<input required minLength={PASSWORD_MIN_LENGTH} maxLength={128} name="confirmPassword" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} type={inputType} aria-invalid={mismatch || undefined} aria-describedby={mismatch ? "security-mismatch" : undefined} className="field-control" /></label>
       {mismatch && <p id="security-mismatch" role="alert" className="text-sm text-danger">Passwords don&apos;t match yet.</p>}
       <input type="hidden" name="captchaToken" value={captchaToken ?? ""} />
       <Turnstile ref={captcha} onToken={setCaptchaToken} />

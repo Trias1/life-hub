@@ -4,6 +4,7 @@ import Link from "next/link"
 import { FormEvent, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, friendlyPasswordError, passwordProblem } from "@/lib/password-rules.mjs"
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -38,6 +39,8 @@ export default function ResetPasswordPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const weak = passwordProblem(password)
+    if (weak) return setMessage(weak)
     setSaving(true)
     setMessage("")
 
@@ -46,7 +49,7 @@ export default function ResetPasswordPage() {
     setSaving(false)
 
     if (error) {
-      setMessage(error.message)
+      setMessage(friendlyPasswordError(error.message) ?? error.message)
       return
     }
 
@@ -65,14 +68,15 @@ export default function ResetPasswordPage() {
         <div className="mt-10">
           <p className="eyebrow">Account recovery</p>
           <h1 className="page-title">Choose a new password</h1>
-          <p className="page-description">Use at least eight characters, then sign in again.</p>
+          <p className="page-description">{PASSWORD_HINT}, then sign in again.</p>
         </div>
         <form onSubmit={submit} className="form-grid mt-8">
           <label className="field-label">
             New password
             <input
               required
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={128}
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}

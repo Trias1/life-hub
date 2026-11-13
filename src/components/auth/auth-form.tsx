@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation"
 import { FormEvent, useRef, useState } from "react"
 import { Eye, EyeOff, MailCheck } from "lucide-react"
 import { passwordStrength } from "@/lib/password-strength"
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH, friendlyPasswordError, passwordProblem } from "@/lib/password-rules.mjs"
 import { createClient } from "@/lib/supabase/client"
 import { Turnstile, type TurnstileHandle } from "./turnstile"
 
 type AuthMode = "login" | "register"
 
 function friendlyError(message: string) {
+  const passwordMessage = friendlyPasswordError(message)
+  if (passwordMessage) return passwordMessage
   if (/invalid login credentials/i.test(message)) return "That email and password don't match. Check them and try again."
   if (/email not confirmed/i.test(message)) return "Confirm your email first. Open the link we sent to your inbox."
   if (/rate limit|too many/i.test(message)) return "Too many attempts. Wait a few minutes and try again."
@@ -37,7 +40,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     const trimmedEmail = email.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) return setError("Enter a valid email address.")
     if (!password) return setError("Enter your password.")
-    if (mode === "register" && password.length < 8) return setError("Use at least 8 characters for your password.")
+    const weak = mode === "register" ? passwordProblem(password) : null
+    if (weak) return setError(weak)
     if (!captchaToken) return setError("Wait a moment for the security check to finish, then try again.")
     setLoading(true)
     setError("")
@@ -86,7 +90,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           {mode === "login" && <Link href="/forgot-password" className="text-xs font-medium text-[var(--muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline">Forgot password?</Link>}
         </div>
         <div className="relative">
-          <input id="auth-password" type={showPassword ? "text" : "password"} name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? "At least 8 characters" : ""} aria-invalid={error ? true : undefined} aria-describedby={[strength && "auth-strength", error && "auth-error"].filter(Boolean).join(" ") || undefined} className="field-control w-full pr-12" />
+          <input id="auth-password" type={showPassword ? "text" : "password"} name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? PASSWORD_MIN_LENGTH : undefined} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={mode === "register" ? PASSWORD_HINT : ""} aria-invalid={error ? true : undefined} aria-describedby={[strength && "auth-strength", error && "auth-error"].filter(Boolean).join(" ") || undefined} className="field-control w-full pr-12" />
           <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-0.5 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded text-[var(--muted)] hover:text-[var(--foreground)]" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
         </div>
         {strength && <p id="auth-strength" className="auth-strength" data-tone={strength.tone}><span aria-hidden /> {strength.label}</p>}
