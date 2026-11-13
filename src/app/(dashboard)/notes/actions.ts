@@ -8,11 +8,14 @@ import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
 import { FIELD, decryptField, encryptField } from "@/lib/data-crypto.mjs"
 import { IMPORT_LIMITS, entryHtml, parseNotesFile } from "@/lib/notes-import.mjs"
 import { descendantIds } from "@/lib/note-tree.mjs"
+import { DOCUMENT_LIMITS, documentToNote } from "@/lib/document-import"
 
-const noteSchema = z.object({ title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80), tags: z.string().max(500) })
+// Note HTML: room for long runbooks imported from Markdown or Word.
+const NOTE_CONTENT_MAX = 150_000
+const noteSchema = z.object({ title: z.string().trim().min(1).max(160), content: z.string().max(NOTE_CONTENT_MAX), folder: z.string().trim().min(1).max(80), tags: z.string().max(500) })
 // "" means top level (no parent).
 const parentIdSchema = z.union([z.literal(""), z.string().uuid()])
-const updateSchema = z.object({ id: z.string().uuid(), title: z.string().trim().min(1).max(160), content: z.string().max(10000), folder: z.string().trim().min(1).max(80).optional(), tags: z.string().max(500).optional(), parentId: parentIdSchema.optional() })
+const updateSchema = z.object({ id: z.string().uuid(), title: z.string().trim().min(1).max(160), content: z.string().max(NOTE_CONTENT_MAX), folder: z.string().trim().min(1).max(80).optional(), tags: z.string().max(500).optional(), parentId: parentIdSchema.optional() })
 const versionSchema = z.object({ noteId: z.string().uuid(), versionId: z.string().uuid() })
 const lifecycleSchema = z.object({ id: z.string().uuid(), from: z.enum(["archived", "trash"]) })
 type NoteActionResult = { error?: string; title?: string; content?: string }
@@ -262,7 +265,7 @@ export async function importNotes(formData: FormData): Promise<void> {
         continue
       }
       const next = previous + "<hr><p>Imported " + stamp + "</p>" + html
-      if (next.length > 10000) {
+      if (next.length > NOTE_CONTENT_MAX) {
         failed.push(entry.title)
         continue
       }
@@ -272,7 +275,7 @@ export async function importNotes(formData: FormData): Promise<void> {
       if (error) failed.push(entry.title)
       else appended++
     } else {
-      if (html.length > 10000) {
+      if (html.length > NOTE_CONTENT_MAX) {
         failed.push(entry.title)
         continue
       }
@@ -310,4 +313,54 @@ export async function reorderSubPages(parentId: string, order: string[]): Promis
   revalidatePath("/notes/" + input.data.parentId)
   for (const id of input.data.order) revalidatePath("/notes/" + id)
   return {}
+}
+
+/**
+ * Markdown, Word (.docx) and plain-text files, one note each, optionally under one of your notes.
+ * The files are converted here on the server (the browser only previews names), never stored.
+ */
+export async function importDocuments(formData: FormData): Promise<void> {
+  const files = formData.getAll("files").filter((value): value is File => typeof value === "object" && value !== null && "arrayBuffer" in value && (value as File).size > 0)
+  if (!files.length) importFailure("Choose at least one .md, .docx or .txt file.")
+  if (files.length > DOCUMENT_LIMITS.files) importFailure("Choose up to " + DOCUMENT_LIMITS.files + " files at a time.")
+  const options = importOptionsSchema.safeParse({ folder: formData.get("folder") || "General", tags: formData.get("tags") ?? "" })
+  const parentId = parentIdSchema.optional().safeParse(formData.get("parentId") || undefined)
+  if (!options.success || !parentId.success) importFailure("Use a folder name of up to 80 characters and fewer tags.")
+  const context = await getWorkspaceContext()
+  if (!context) importFailure("Your session expired. Sign in again.")
+  const parent = parentId.data ? await findOwnActiveNote(context, parentId.data) : null
+  if (parentId.data && !parent) importFailure("The note to put these under wasn't found. Pick another one.")
+
+  const tags = parseTags(options.data.tags)
+  const created: string[] = []
+  const failed: string[] = []
+  for (const file of files) {
+    const note = await documentToNote(file)
+    if ("error" in note) {
+      failed.push(note.error)
+      continue
+    }
+    if (!note.html.replace(/<[^>]*>/g, "").trim()) {
+      failed.push(file.name + " is empty")
+      continue
+    }
+    if (note.html.length > NOTE_CONTENT_MAX) {
+      failed.push(file.name + " is too long for one note (split it into smaller files)")
+      continue
+    }
+    const { data, error } = await context.supabase.from("notes").insert({ title: note.title, content: encryptField(FIELD.NOTE_CONTENT, note.html), folder: parent?.folder ?? options.data.folder, tags, parent_id: parent?.id ?? null, workspace_id: context.workspaceId, author_id: context.user.id }).select("id").single()
+    if (error || !data) failed.push(file.name + " couldn't be saved")
+    else created.push(data.id)
+  }
+
+  if (created.length) await recordActivity(context, { action: "Imported " + created.length + (created.length === 1 ? " document" : " documents"), entityType: "note", link: parent ? "/notes/" + parent.id : "/notes" })
+  revalidatePath("/notes")
+  revalidatePath("/activity")
+  if (parent) revalidatePath("/notes/" + parent.id)
+  const summary = created.length + (created.length === 1 ? " note" : " notes") + " imported"
+  if (failed.length) {
+    const message = (created.length ? summary + ". " : "") + "Not imported: " + failed.slice(0, 5).join("; ") + (failed.length > 5 ? " and " + (failed.length - 5) + " more" : "") + "."
+    redirect((created.length ? "/notes" : "/notes/import") + "?error=" + encodeURIComponent(message))
+  }
+  redirect((created.length === 1 ? "/notes/" + created[0] : parent ? "/notes/" + parent.id : "/notes") + "?success=" + encodeURIComponent(summary))
 }

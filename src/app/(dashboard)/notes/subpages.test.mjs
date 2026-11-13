@@ -93,3 +93,15 @@ test("recovery codes: hashed, single use, throttled, and they remove the factors
   assert.match(recovery, /admin\.auth\.admin\.mfa\.deleteFactor\(\{ id: factor\.id, userId: user\.userId \}\)/)
   assert.doesNotMatch(recovery, /code_hash: code\b/)
 })
+
+test("document import converts on the server, under your own note only, without images or unsafe links", () => {
+  const source = actions.slice(actions.indexOf("export async function importDocuments"))
+  const documents = read("../../../lib/document-import.ts")
+  assert.match(source, /findOwnActiveNote\(context, parentId\.data\)/)
+  assert.match(source, /documentToNote\(file\)/)
+  assert.match(source, /content: encryptField\(FIELD\.NOTE_CONTENT, note\.html\)/)
+  assert.match(source, /note\.html\.length > NOTE_CONTENT_MAX/)
+  assert.ok(documents.includes(String.raw`.replace(/<img\b[^>]*>/gi, "")`), "images are removed")
+  assert.ok(documents.includes(String.raw`/^(https:\/\/|mailto:)/i.test(`), "only https and mailto links are kept")
+  assert.ok(documents.includes(String.raw`!== "PK\u0003\u0004"`), "only real .docx (zip) files are read")
+})

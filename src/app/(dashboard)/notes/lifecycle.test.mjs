@@ -87,7 +87,8 @@ test("importing notes re-reads the file on the server and only appends to your o
   assert.match(source, /\.eq\("id", match\.id\)\.eq\("author_id", context\.user\.id\)/);
   assert.match(source, /insert\(\{ title: entry\.title, content: encryptField\(FIELD\.NOTE_CONTENT, html\)/);
   assert.match(listPage, /href="\/notes\/import"/);
-  assert.match(importPage, /action=\{importNotes\}/);
+  assert.match(importPage, /importList=\{importNotes\}/);
+  assert.match(importPage, /importDocuments=\{importDocuments\}/);
 });
 
 test("account cards are shown on notes only, not on task descriptions", () => {

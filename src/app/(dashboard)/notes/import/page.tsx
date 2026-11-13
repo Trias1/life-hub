@@ -1,15 +1,16 @@
 import Link from "next/link"
 import { NoteImportForm } from "@/components/notes/note-import-form"
+import { flattenTree } from "@/lib/note-tree.mjs"
 import { getWorkspaceContext } from "@/lib/workspace/server"
-import { importNotes } from "../actions"
+import { importDocuments, importNotes } from "../actions"
 
 export default async function ImportNotesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams
   const context = await getWorkspaceContext()
   if (!context) return null
-  // Titles of your active notes, so the preview can show which entries will be appended instead of created.
+  // Your active notes: titles for "add to existing" in the list format, and the "Put under" choices.
   const [{ data: mine }, { data: folderRows }] = await Promise.all([
-    context.supabase.from("notes").select("title").eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).is("deleted_at", null).is("archived_at", null),
+    context.supabase.from("notes").select("id,title,parent_id,sort_order,created_at").eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).is("deleted_at", null).is("archived_at", null).order("title"),
     context.supabase.from("notes").select("folder").eq("workspace_id", context.workspaceId).is("deleted_at", null),
   ])
 
@@ -20,13 +21,15 @@ export default async function ImportNotesPage({ searchParams }: { searchParams: 
         <span aria-hidden>/</span>
         <span>Import</span>
       </nav>
-      <h1 className="issue-title mt-4">Import notes from a file</h1>
-      <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">The file is read for this import only and isn&apos;t stored. A title that matches one of your notes adds the text to that note, and its earlier version stays in the history.</p>
+      <h1 className="issue-title mt-4">Import notes from files</h1>
+      <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">Markdown (.md), Word (.docx) and text files. The files are read for this import only and aren&apos;t stored; the notes are encrypted like any other note.</p>
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <NoteImportForm
-        action={importNotes}
+        importList={importNotes}
+        importDocuments={importDocuments}
         existingTitles={Array.from(new Set((mine ?? []).map((note) => note.title.trim().toLowerCase())))}
         folders={Array.from(new Set((folderRows ?? []).map((row) => row.folder).filter(Boolean)))}
+        parents={flattenTree(mine ?? []).map((note) => ({ value: note.id, label: "  ".repeat(note.depth) + note.title }))}
       />
     </div>
   )
