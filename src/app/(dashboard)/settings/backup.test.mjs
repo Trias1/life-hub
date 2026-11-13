@@ -43,6 +43,8 @@ test("only the owner changes the schedule or makes a backup by hand, rate limite
   const save = actions.slice(actions.indexOf("export async function saveBackupSchedule"))
   assert.match(save, /context\.role !== "super_admin"/)
   assert.match(save, /updated_by: context\.user\.id/)
+  assert.doesNotMatch(save, /\.upsert\(/, "an upsert rewrites workspace_id, which the owner may not update")
+  assert.match(save, /\.update\(schedule\)\.eq\("workspace_id", context\.workspaceId\)/)
   const run = actions.slice(actions.indexOf("export async function runBackupNow"))
   assert.match(run, /context\.role !== "super_admin"/)
   assert.ok(run.indexOf("checkRequestLimit(context.supabase, \"export\")") < run.indexOf("runWorkspaceBackup("))

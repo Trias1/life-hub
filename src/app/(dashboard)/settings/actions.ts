@@ -162,8 +162,17 @@ export async function saveBackupSchedule(formData: FormData): Promise<{ error?: 
   const context = await getWorkspaceContext()
   if (!context) return { error: "Your session expired. Sign in again." }
   if (context.role !== "super_admin") return { error: "Only the workspace owner can change backups." }
-  const { error } = await context.supabase.from("workspace_backup_settings").upsert({ workspace_id: context.workspaceId, frequency: input.data.frequency, hour: input.data.hour, weekday: input.data.weekday, month_day: input.data.monthDay, keep_count: input.data.keepCount, updated_by: context.user.id, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" })
-  if (error) return { error: "Couldn't save the backup schedule." }
+  const schedule = { frequency: input.data.frequency, hour: input.data.hour, weekday: input.data.weekday, month_day: input.data.monthDay, keep_count: input.data.keepCount, updated_by: context.user.id, updated_at: new Date().toISOString() }
+  // Insert or update, not upsert: an upsert also rewrites workspace_id, which the owner may not update (0040).
+  const { data: existing, error: readError } = await context.supabase.from("workspace_backup_settings").select("workspace_id").eq("workspace_id", context.workspaceId).maybeSingle()
+  if (readError) return { error: "Couldn't save the backup schedule." }
+  const { error } = existing
+    ? await context.supabase.from("workspace_backup_settings").update(schedule).eq("workspace_id", context.workspaceId)
+    : await context.supabase.from("workspace_backup_settings").insert({ workspace_id: context.workspaceId, ...schedule })
+  if (error) {
+    console.error("save backup schedule", error.code, error.message)
+    return { error: "Couldn't save the backup schedule." }
+  }
   revalidatePath("/settings")
   return {}
 }
