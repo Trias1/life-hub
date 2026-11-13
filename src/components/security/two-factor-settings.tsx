@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react"
 import { Check, Copy, ShieldCheck, Smartphone, Trash2 } from "lucide-react"
 import { formatDateTime } from "@/lib/format-date"
 import { createClient } from "@/lib/supabase/client"
+import { RecoveryCodes } from "./recovery-codes"
 
 type FactorRow = { id: string; name: string; createdAt: string }
 type Enrollment = { factorId: string; qrCode: string; secret: string }
@@ -167,9 +168,11 @@ export function TwoFactorSettings() {
             <button type="button" disabled={busy} onClick={() => void startEnrollment()} className="button-primary disabled:opacity-60">{factors.length ? "Add another authenticator" : "Set up authenticator app"}</button>
           )}
 
+          {factors.length > 0 && !enrollment && <RecoveryCodes />}
+
           <div className="rounded-xl bg-[var(--surface-muted)] p-3 text-sm text-zinc-500">
             <p className="font-semibold text-[var(--foreground)]">Backup</p>
-            <p className="mt-1">Add a second authenticator (another phone or a password manager) so losing one device doesn&apos;t lock you out. If you lose all of them, the workspace owner can remove your factors in the Supabase dashboard (Authentication → Users → your account).</p>
+            <p className="mt-1">Make recovery codes, and add a second authenticator (another phone or a password manager) so losing one device doesn&apos;t lock you out.</p>
           </div>
         </>
       )}

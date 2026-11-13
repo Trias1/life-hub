@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { FormEvent, useEffect, useState } from "react"
 import { Select } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { redeemRecoveryCode } from "@/app/(auth)/mfa/actions"
 
 type FactorOption = { id: string; name: string }
 
@@ -15,6 +16,7 @@ export function MfaChallengeForm() {
   const [code, setCode] = useState("")
   const [error, setError] = useState("")
   const [verifying, setVerifying] = useState(false)
+  const [mode, setMode] = useState<"code" | "recovery" | "recovered">("code")
 
   useEffect(() => {
     createClient().auth.mfa.listFactors().then(({ data, error: listError }) => {
@@ -47,12 +49,41 @@ export function MfaChallengeForm() {
     router.refresh()
   }
 
+  async function submitRecovery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setVerifying(true)
+    setError("")
+    const result = await redeemRecoveryCode(new FormData(event.currentTarget))
+    setVerifying(false)
+    if ("error" in result) return setError(result.error)
+    setMode("recovered")
+  }
+
   async function signOut() {
     await createClient().auth.signOut()
     router.replace("/login")
   }
 
+  if (mode === "recovered") return (
+    <div className="space-y-4">
+      <p role="status" className="auth-alert" data-tone="success">Two-factor is off for this account and you&apos;ve been signed out everywhere.</p>
+      <p className="text-sm text-[var(--muted)]">Sign in again with your password, then go to Security → Two-factor authentication to set up a new authenticator and make new recovery codes.</p>
+      <button type="button" onClick={() => { router.replace("/login"); router.refresh() }} className="button-primary w-full">Sign in again</button>
+    </div>
+  )
   if (!factors) return <p className="text-sm text-[var(--muted)]" aria-busy="true">Loading…</p>
+  if (mode === "recovery") return (
+    <form onSubmit={submitRecovery} className="space-y-4" noValidate>
+      <p className="text-sm text-[var(--muted)]">Lost your phone? Enter one of the recovery codes you saved. This turns two-factor off so you can sign in and set it up again.</p>
+      <div className="space-y-1.5">
+        <label htmlFor="recovery-code" className="auth-label">Recovery code</label>
+        <input id="recovery-code" name="code" autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={24} autoFocus required placeholder="K7QM-2XPA-9RTB-WN4D" aria-invalid={error ? true : undefined} aria-describedby={error ? "mfa-error" : undefined} className="field-control w-full font-mono tracking-wider" />
+      </div>
+      {error && <p id="mfa-error" role="alert" className="auth-alert" data-tone="error">{error}</p>}
+      <button disabled={verifying} className="button-primary w-full disabled:opacity-60">{verifying ? "Checking…" : "Use recovery code"}</button>
+      <button type="button" onClick={() => { setMode("code"); setError("") }} className="w-full text-sm text-[var(--muted)] underline underline-offset-2 hover:text-[var(--foreground)]">Use my authenticator instead</button>
+    </form>
+  )
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
       {factors.length > 1 && (
@@ -67,6 +98,7 @@ export function MfaChallengeForm() {
       </div>
       {error && <p id="mfa-error" role="alert" className="auth-alert" data-tone="error">{error}</p>}
       <button disabled={verifying || !factors.length} className="button-primary w-full disabled:opacity-60">{verifying ? "Verifying…" : "Verify"}</button>
+      <button type="button" onClick={() => { setMode("recovery"); setError(""); setCode("") }} className="w-full text-sm text-[var(--muted)] underline underline-offset-2 hover:text-[var(--foreground)]">Lost your phone? Use a recovery code</button>
       <button type="button" onClick={() => void signOut()} className="w-full text-sm text-[var(--muted)] underline underline-offset-2 hover:text-[var(--foreground)]">Use a different account</button>
     </form>
   )

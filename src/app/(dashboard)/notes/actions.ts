@@ -289,3 +289,25 @@ export async function importNotes(formData: FormData): Promise<void> {
   if (failed.length) redirect("/notes?error=" + encodeURIComponent((summary ? "Imported " + summary + ". " : "") + "Could not import: " + failed.slice(0, 5).join(", ") + (failed.length > 5 ? " and " + (failed.length - 5) + " more" : "") + " (too long or unreadable)."))
   redirect("/notes?success=" + encodeURIComponent("Imported " + summary))
 }
+
+const reorderSchema = z.object({ parentId: z.string().uuid(), order: z.array(z.string().uuid()).min(1).max(500) })
+
+/** Saves the order of a page's sub-pages (drag and drop in the Pages panel). Only the author's own sub-pages. */
+export async function reorderSubPages(parentId: string, order: string[]): Promise<{ error?: string }> {
+  const input = reorderSchema.safeParse({ parentId, order })
+  if (!input.success || new Set(input.data.order).size !== input.data.order.length) return { error: "That order could not be saved." }
+  const context = await getWorkspaceContext()
+  if (!context) return { error: "No active workspace found." }
+
+  const { data: children, error } = await context.supabase.from("notes").select("id").eq("parent_id", input.data.parentId).eq("workspace_id", context.workspaceId).eq("author_id", context.user.id).is("deleted_at", null).is("archived_at", null)
+  if (error) return { error: "That order could not be saved." }
+  const own = new Set((children ?? []).map((row) => row.id))
+  if (own.size !== input.data.order.length || input.data.order.some((id) => !own.has(id))) return { error: "The sub-pages changed. Reload and try again." }
+
+  const results = await Promise.all(input.data.order.map((id, index) => context.supabase.from("notes").update({ sort_order: index }).eq("id", id).eq("parent_id", input.data.parentId).eq("workspace_id", context.workspaceId).eq("author_id", context.user.id)))
+  if (results.some((result) => result.error)) return { error: "That order could not be saved." }
+  revalidatePath("/notes")
+  revalidatePath("/notes/" + input.data.parentId)
+  for (const id of input.data.order) revalidatePath("/notes/" + id)
+  return {}
+}

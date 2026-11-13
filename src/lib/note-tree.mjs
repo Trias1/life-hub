@@ -3,8 +3,21 @@
 // (archived, trashed, or filtered out) is treated as a top-level note.
 
 /**
- * Map of parent id → child rows, in the order given. Unknown parents map to null (top level).
- * @template {{ id: string, parent_id?: string | null }} T
+ * Order of sub-pages under one parent: sort_order first (set by drag and drop), then creation time.
+ * @param {{ sort_order?: number | null, created_at?: string | null }} a
+ * @param {{ sort_order?: number | null, created_at?: string | null }} b
+ */
+export function compareSiblings(a, b) {
+  const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER
+  const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER
+  if (orderA !== orderB) return orderA - orderB
+  return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""))
+}
+
+/**
+ * Map of parent id → child rows. Top-level notes (key null, including notes whose parent is not in
+ * the set) keep the order given; sub-pages are sorted with compareSiblings.
+ * @template {{ id: string, parent_id?: string | null, sort_order?: number | null, created_at?: string | null }} T
  * @param {T[]} rows
  * @returns {Map<string | null, T[]>}
  */
@@ -17,6 +30,7 @@ export function childrenByParent(rows) {
     if (!map.has(key)) map.set(key, [])
     map.get(key)?.push(row)
   }
+  for (const [key, children] of map) if (key !== null) children.sort(compareSiblings)
   return map
 }
 

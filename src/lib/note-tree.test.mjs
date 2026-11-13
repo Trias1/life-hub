@@ -42,3 +42,15 @@ test("heading labels are trimmed and kept short", () => {
   assert.equal(headingLabel("  Monitoring \n Grafana "), "Monitoring Grafana")
   assert.equal(headingLabel("x".repeat(100)).length, 80)
 })
+
+test("sub-pages follow their saved order, then creation time; top-level order is kept", () => {
+  const rows = [
+    { id: "p", parent_id: null },
+    { id: "late", parent_id: "p", created_at: "2026-11-03", sort_order: null },
+    { id: "second", parent_id: "p", created_at: "2026-11-01", sort_order: 1 },
+    { id: "first", parent_id: "p", created_at: "2026-11-02", sort_order: 0 },
+    { id: "early", parent_id: "p", created_at: "2026-10-01", sort_order: null },
+    { id: "z", parent_id: null },
+  ]
+  assert.deepEqual(flattenTree(rows).map((row) => row.id), ["p", "first", "second", "early", "late", "z"])
+})

@@ -77,6 +77,6 @@ test("an unreadable Google token cannot take the calendar page down", async () =
   const auth = read("../../../lib/google-drive-auth.ts")
   const calendarEvents = auth.slice(auth.indexOf("export async function getGoogleCalendarEvents"))
   const tryAt = calendarEvents.indexOf("try {")
-  assert.ok(tryAt > 0 && tryAt < calendarEvents.indexOf("decryptToken("), "decryptToken must run inside try")
+  assert.ok(tryAt > 0 && tryAt < calendarEvents.indexOf("readToken("), "the token must be read inside try")
   assert.ok(tryAt < calendarEvents.indexOf("createGoogleOAuthClient()"), "OAuth client setup must run inside try")
 })

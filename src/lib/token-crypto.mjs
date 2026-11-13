@@ -15,6 +15,26 @@ export function encryptToken(token, secret) {
   return [PREFIX, iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), encrypted.toString("base64url")].join(":")
 }
 
+/**
+ * Decrypts with the first key that works, so the encryption key can be changed without losing
+ * stored tokens. `keyIndex` > 0 (or a legacy plain token, -1) means the caller should re-encrypt.
+ * @param {string} token
+ * @param {string[]} secrets current key first, then older keys
+ * @returns {{ token: string, keyIndex: number }}
+ */
+export function decryptTokenWithKeys(token, secrets) {
+  if (!token.startsWith(PREFIX + ":")) return { token, keyIndex: -1 }
+  let lastError
+  for (const [keyIndex, secret] of secrets.entries()) {
+    try {
+      return { token: decryptToken(token, secret), keyIndex }
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError ?? new Error("No token encryption key configured")
+}
+
 /** @param {string} token @param {string} secret */
 export function decryptToken(token, secret) {
   if (!token.startsWith(PREFIX + ":")) return token

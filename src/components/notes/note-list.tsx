@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { type ReactNode, useEffect, useState } from "react"
-import { ChevronDown, CornerDownRight, Pin, SquarePen } from "lucide-react"
+import { ChevronDown, CornerDownRight, Pin, Plus, SquarePen } from "lucide-react"
 
 export type NoteListRow = {
   id: string
@@ -17,6 +17,8 @@ export type NoteListRow = {
   childCount: number
   /** Shown in search results, where sub-pages appear without their parent. */
   parentTitle?: string
+  /** Your own active note: offer "New sub-page". */
+  canAddSubPage: boolean
 }
 
 const STORAGE_KEY = "lifehub:notes-collapsed"
@@ -75,6 +77,7 @@ export function NoteList({ rows }: { rows: NoteListRow[] }) {
               {row.tags}
             </div>
             <div className="issue-row-side">
+              {row.canAddSubPage && <Link href={"/notes/new?parent=" + row.id} className="issue-row-add" aria-label={"New sub-page in " + row.title} title="New sub-page"><Plus size={14} aria-hidden /></Link>}
               {row.isFavorite && <span className="issue-pin" title="Pinned"><Pin size={13} aria-hidden /><span className="sr-only">Pinned</span></span>}
               <span>updated {row.updatedLabel}</span>
             </div>

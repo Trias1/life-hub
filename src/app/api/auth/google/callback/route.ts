@@ -1,30 +1,28 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createGoogleOAuthClient, saveWorkspaceDriveConnection } from "@/lib/google-drive-auth"
+import { clearGoogleOAuth, finishGoogleOAuth } from "@/lib/google-oauth-flow"
 import { getWorkspaceContext } from "@/lib/workspace/server"
 
 export const runtime = "nodejs"
 
 export async function GET(request: NextRequest) {
-  const params = new URL(request.url).searchParams
-  if (params.get("error")) return NextResponse.redirect(new URL("/settings?error=Google+authorization+was+cancelled", request.url))
-  const code = params.get("code")
-  const state = params.get("state")
-  const savedState = request.cookies.get("lifehub_google_oauth_state")?.value
-  if (!code || !state || !savedState || state !== savedState) return NextResponse.redirect(new URL("/settings?error=Invalid+Google+OAuth+state", request.url))
-  const workspaceId = state.split(":")[1]
+  const fail = (message: string) => clearGoogleOAuth(request, NextResponse.redirect(new URL("/settings?error=" + encodeURIComponent(message), request.url)), "drive")
+  if (request.nextUrl.searchParams.get("error")) return fail("Google authorization was cancelled")
+  const code = request.nextUrl.searchParams.get("code")
   const context = await getWorkspaceContext()
-  if (!context || context.workspaceId !== workspaceId || context.role !== "super_admin") return NextResponse.redirect(new URL("/settings?error=Workspace+connection+was+not+authorized", request.url))
+  if (!context || context.role !== "super_admin") return fail("Workspace connection was not authorized")
+  // The state must match the sign-in this same owner started for this same workspace.
+  const codeVerifier = finishGoogleOAuth(request, { flow: "drive", userId: context.user.id, workspaceId: context.workspaceId })
+  if (!code || !codeVerifier) return fail("Invalid Google OAuth state. Start the connection again.")
 
   try {
     const client = createGoogleOAuthClient(new URL("/api/auth/google/callback", request.url).toString())
-    const { tokens } = await client.getToken(code)
+    const { tokens } = await client.getToken({ code, codeVerifier })
     if (!tokens.refresh_token) throw new Error("Google did not return a refresh token. Reconnect with consent prompt.")
-    await saveWorkspaceDriveConnection({ workspaceId, refreshToken: tokens.refresh_token, connectedBy: context.user.id })
-    const response = NextResponse.redirect(new URL("/settings?google=connected", request.url))
-    response.cookies.delete("lifehub_google_oauth_state")
-    return response
+    await saveWorkspaceDriveConnection({ workspaceId: context.workspaceId, refreshToken: tokens.refresh_token, connectedBy: context.user.id })
+    return clearGoogleOAuth(request, NextResponse.redirect(new URL("/settings?google=connected", request.url)), "drive")
   } catch (error) {
     console.error("google oauth callback", error instanceof Error ? error.message : "unknown error")
-    return NextResponse.redirect(new URL("/settings?error=Could+not+connect+Google+Drive", request.url))
+    return fail("Could not connect Google Drive")
   }
 }

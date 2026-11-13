@@ -1,8 +1,13 @@
 ﻿import { google } from "googleapis"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { decryptToken, encryptToken } from "@/lib/token-crypto.mjs"
+import { decryptTokenWithKeys, encryptToken } from "@/lib/token-crypto.mjs"
 
+// Service-account access (optional GOOGLE_DRIVE_CLIENT_EMAIL setup) keeps the full Drive scope.
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
+// Workspace owners connect with drive.file: LifeHub only sees the files and folders it created
+// itself, not the rest of the owner's Drive. Connections made before this keep their old scope
+// until they reconnect.
+export const GOOGLE_DRIVE_OAUTH_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 export const GOOGLE_ACCOUNT_SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/calendar.readonly"]
 
 export function isGoogleInvalidGrant(error: unknown) {
@@ -21,19 +26,31 @@ function required(name: string) {
   return value
 }
 
+/**
+ * Keys for Google refresh tokens: GOOGLE_TOKEN_ENCRYPTION_KEY when set, else the Supabase secret
+ * (older deployments). Tokens written under the Supabase secret stay readable and are re-encrypted
+ * with the dedicated key the next time they are read.
+ */
+function tokenSecrets() {
+  const dedicated = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY?.trim()
+  const legacy = process.env.SUPABASE_SECRET_KEY
+  const secrets = [dedicated || legacy, dedicated && legacy !== dedicated ? legacy : undefined].filter((secret): secret is string => Boolean(secret))
+  if (!secrets.length) throw new Error("Missing token encryption configuration")
+  return secrets
+}
+
 function tokenSecret() {
-  // ponytail: reuse the existing server secret unless a dedicated encryption key is configured.
-  const secret = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY ?? process.env.SUPABASE_SECRET_KEY
-  if (!secret) throw new Error("Missing token encryption configuration")
-  return secret
+  return tokenSecrets()[0]
+}
+
+/** The plain refresh token, and whether it should be stored again under the current key. */
+function readToken(stored: string) {
+  const { token, keyIndex } = decryptTokenWithKeys(stored, tokenSecrets())
+  return { token, stale: keyIndex !== 0 }
 }
 
 export function createGoogleOAuthClient(redirectUri?: string) {
   return new google.auth.OAuth2(required("GOOGLE_CLIENT_ID"), required("GOOGLE_CLIENT_SECRET"), redirectUri)
-}
-
-export function getGoogleDriveAuthUrl(state: string, redirectUri: string) {
-  return createGoogleOAuthClient(redirectUri).generateAuthUrl({ access_type: "offline", prompt: "consent", scope: [GOOGLE_DRIVE_SCOPE], state })
 }
 
 export async function getWorkspaceDriveConnection(workspaceId: string) {
@@ -41,8 +58,8 @@ export async function getWorkspaceDriveConnection(workspaceId: string) {
   const { data, error } = await admin.from("workspace_google_drive_connections").select("workspace_id,refresh_token,root_folder_id").eq("workspace_id", workspaceId).maybeSingle()
   if (error) throw error
   if (!data) return null
-  const refreshToken = decryptToken(data.refresh_token, tokenSecret())
-  if (!data.refresh_token.startsWith("v1:")) {
+  const { token: refreshToken, stale } = readToken(data.refresh_token)
+  if (stale) {
     const { error: migrationError } = await admin.from("workspace_google_drive_connections").update({ refresh_token: encryptToken(refreshToken, tokenSecret()), updated_at: new Date().toISOString() }).eq("workspace_id", workspaceId)
     if (migrationError) throw migrationError
   }
@@ -98,7 +115,7 @@ export async function disconnectGoogleAccount(userId: string) {
   const { data } = await admin.from("google_oauth_tokens").select("refresh_token").eq("user_id", userId).maybeSingle()
   if (data?.refresh_token) {
     try {
-      await createGoogleOAuthClient().revokeToken(decryptToken(data.refresh_token, tokenSecret()))
+      await createGoogleOAuthClient().revokeToken(readToken(data.refresh_token).token)
     } catch (error) {
       const value = error as { response?: { status?: number; data?: { error?: unknown } }; code?: number }
       const status = value.response?.status ?? value.code
@@ -121,7 +138,12 @@ export async function getGoogleCalendarEvents(userId: string, timeMin = new Date
   // missing OAuth config must not take the whole Calendar page down. Reconnecting Google fixes the token.
   try {
     const auth = createGoogleOAuthClient()
-    auth.setCredentials({ refresh_token: decryptToken(data.refresh_token, tokenSecret()) })
+    const { token: refreshToken, stale } = readToken(data.refresh_token)
+    auth.setCredentials({ refresh_token: refreshToken })
+    if (stale) {
+      const { error: rewriteError } = await createAdminClient().from("google_oauth_tokens").update({ refresh_token: encryptToken(refreshToken, tokenSecret()), updated_at: new Date().toISOString() }).eq("user_id", userId)
+      if (rewriteError) console.error("Could not re-encrypt Google account token", rewriteError.message)
+    }
     const calendar = google.calendar({ version: "v3", auth })
     const response = await calendar.events.list({ calendarId: "primary", timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: true, orderBy: "startTime", maxResults: 100 })
     return (response.data.items ?? []).flatMap((event) => {

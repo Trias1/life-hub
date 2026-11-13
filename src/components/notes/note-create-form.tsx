@@ -12,8 +12,10 @@ const DRAFT_KEY = "lifehub:note-draft"
 type Draft = { title: string; content: string; folder: string; tags: string }
 const emptyDraft: Draft = { title: "", content: "", folder: "General", tags: "" }
 
-export function NoteCreateForm({ action, workspaceId, folders }: { action: (formData: FormData) => Promise<void>; workspaceId: string; folders: string[] }) {
-  const [draft, setDraft] = useState<Draft>(emptyDraft)
+type Parent = { id: string; title: string; folder: string }
+
+export function NoteCreateForm({ action, workspaceId, folders, parent }: { action: (formData: FormData) => Promise<void>; workspaceId: string; folders: string[]; parent?: Parent | null }) {
+  const [draft, setDraft] = useState<Draft>(() => parent ? { ...emptyDraft, folder: parent.folder } : emptyDraft)
   const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -24,12 +26,13 @@ export function NoteCreateForm({ action, workspaceId, folders }: { action: (form
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(DRAFT_KEY)
-      if (saved) setDraft({ ...emptyDraft, ...(JSON.parse(saved) as Partial<Draft>) })
+      // A sub-page starts in its parent's folder; the saved draft can still bring back text.
+      if (saved) setDraft({ ...emptyDraft, ...(JSON.parse(saved) as Partial<Draft>), ...(parent ? { folder: parent.folder } : {}) })
     } catch {
       window.localStorage.removeItem(DRAFT_KEY)
     }
     setLoaded(true)
-  }, [])
+  }, [parent])
 
   useEffect(() => {
     if (!loaded) return
@@ -52,12 +55,13 @@ export function NoteCreateForm({ action, workspaceId, folders }: { action: (form
       formData.set("content", await processImages(draft.content, workspaceId))
       formData.set("folder", draft.folder)
       formData.set("tags", draft.tags)
+      if (parent) formData.set("parentId", parent.id)
       await action(formData)
     } catch (error) {
       // redirect() from the server action surfaces as a thrown navigation; let it through,
       // and drop the local draft only when it leads to the new note (not back to this form).
       if (error && typeof error === "object" && "digest" in error) {
-        if (!String(error.digest).includes("/notes/new")) window.localStorage.removeItem(DRAFT_KEY)
+        if (!String(error.digest).includes("error=")) window.localStorage.removeItem(DRAFT_KEY)
         throw error
       }
       setStatus("Could not create the note: " + (error instanceof Error ? error.message : "unknown error"))
@@ -67,6 +71,7 @@ export function NoteCreateForm({ action, workspaceId, folders }: { action: (form
 
   return (
     <form onSubmit={submit} className="issue-form mt-6">
+      {parent && <p className="issue-form-field text-sm text-[var(--muted)]">Sub-page of <Link href={"/notes/" + parent.id} className="font-semibold text-[var(--foreground)] hover:underline">{parent.title}</Link></p>}
       <div className="issue-form-field">
         <label htmlFor="note-title" className="issue-form-label">Title <span className="font-normal text-[var(--muted)]">(required)</span></label>
         <input id="note-title" required maxLength={160} autoFocus value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="field-control" />
@@ -86,7 +91,7 @@ export function NoteCreateForm({ action, workspaceId, folders }: { action: (form
       </div>
       <div className="issue-form-actions">
         <button disabled={submitting} className="button-primary disabled:opacity-60">{submitting ? "Creating…" : "Create note"}</button>
-        <Link href="/notes" className="button-secondary">Cancel</Link>
+        <Link href={parent ? "/notes/" + parent.id : "/notes"} className="button-secondary">Cancel</Link>
         <span role="status" className="text-xs text-[var(--muted)]">{status}</span>
       </div>
     </form>

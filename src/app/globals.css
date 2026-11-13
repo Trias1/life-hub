@@ -1873,6 +1873,10 @@ button.note-tree-twist:hover { color: var(--foreground); }
 .note-tree-add { display: flex; width: 100%; align-items: center; gap: 0.45rem; margin-top: 0.5rem; border-top: 1px solid var(--line); padding: 0.6rem 0.4rem 0.1rem; font-size: 0.85rem; color: var(--muted); }
 .note-tree-add:hover { color: var(--foreground); }
 .note-tree-form { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+.note-tree-grip { display: grid; place-items: center; width: 1.1rem; flex-shrink: 0; cursor: grab; color: var(--muted); opacity: 0; }
+.note-tree-row:hover .note-tree-grip { opacity: 1; }
+@media (hover: none) { .note-tree-grip { display: none; } }
+.note-tree li[data-dragging] > .note-tree-row { opacity: 0.45; }
 .note-tree-form .field-control { min-width: 0; }
 
 .note-toc { list-style: none; margin: 0.5rem 0 0; padding: 0; border-left: 1px solid var(--line); font-size: 0.82rem; }
@@ -1905,3 +1909,7 @@ button.note-tree-twist:hover { color: var(--foreground); }
 .issue-row-twist { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; flex-shrink: 0; border-radius: 0.3rem; color: var(--muted); }
 .issue-row-twist:hover { background: var(--surface-muted); color: var(--foreground); }
 .issue-row-spacer { width: 1.25rem; flex-shrink: 0; }
+.issue-row-add { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.4rem; color: var(--muted); opacity: 0; transition: opacity 0.15s; }
+.issue-row:hover .issue-row-add, .issue-row-add:focus-visible { opacity: 1; }
+@media (hover: none) { .issue-row-add { opacity: 1; } }
+.issue-row-add:hover { background: var(--surface-muted); color: var(--foreground); }

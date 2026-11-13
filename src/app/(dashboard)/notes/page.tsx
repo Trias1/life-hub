@@ -34,7 +34,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     return query
   }
 
-  let notesQuery = supabase.from("notes").select("id,title,folder,tags,is_favorite,parent_id,created_at,updated_at").eq("workspace_id", context.workspaceId)
+  let notesQuery = supabase.from("notes").select("id,title,folder,tags,is_favorite,parent_id,author_id,sort_order,created_at,updated_at").eq("workspace_id", context.workspaceId)
   if (view === "active") notesQuery = notesQuery.is("deleted_at", null).is("archived_at", null)
   if (view === "archived") notesQuery = notesQuery.is("deleted_at", null).not("archived_at", "is", null)
   if (view === "trash") notesQuery = notesQuery.not("deleted_at", "is", null)
@@ -85,6 +85,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     depth: note.depth,
     childCount: note.childCount,
     parentTitle: !asTree && note.parent_id ? titles.get(note.parent_id) : undefined,
+    canAddSubPage: view === "active" && note.author_id === context.user.id,
     tags: (note.tags ?? []).length > 0 && (
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {(note.tags ?? []).map((tag: string) => <Link key={tag} href={href({ label: tag, page: undefined })}><TagChip tag={tag} /></Link>)}

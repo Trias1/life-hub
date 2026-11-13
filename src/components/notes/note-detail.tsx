@@ -34,7 +34,7 @@ type Props = {
   subPages: { id: string; title: string }[]
   /** Your own active notes this one can move under (never itself or its own sub-pages). */
   parentOptions: { value: string; label: string }[]
-  actions: { updateNote: EditAction; restoreNoteVersion: EditAction; archiveNote: FormAction; trashNote: FormAction; restoreNote: FormAction; deleteNotePermanently: FormAction; toggleFavorite: FormAction; createNote: FormAction }
+  actions: { updateNote: EditAction; restoreNoteVersion: EditAction; archiveNote: FormAction; trashNote: FormAction; restoreNote: FormAction; deleteNotePermanently: FormAction; toggleFavorite: FormAction; createNote: FormAction; reorderSubPages: (parentId: string, order: string[]) => Promise<{ error?: string }> }
 }
 
 export function NoteDetail({ note, versions, workspaceId, folders, canEdit, authorName, createdLabel, createdAt, createdIso, updatedLabel, pages, parent, subPages, parentOptions, actions }: Props) {
@@ -56,7 +56,7 @@ export function NoteDetail({ note, versions, workspaceId, folders, canEdit, auth
   const [pagesOpen, setPagesOpen] = useState(false)
   const tocRef = useRef<HTMLDetailsElement>(null)
   const showPages = state === "active" && (pages.length > 1 || canEdit)
-  const pagesPanel = <NotePages pages={pages} currentId={note.id} canAdd={canEdit && state === "active"} addSubPage={actions.createNote} />
+  const pagesPanel = <NotePages pages={pages} currentId={note.id} canAdd={canEdit && state === "active"} addSubPage={actions.createNote} reorder={canEdit && state === "active" ? actions.reorderSubPages : undefined} />
 
   useEffect(() => {
     if (!menuOpen) return

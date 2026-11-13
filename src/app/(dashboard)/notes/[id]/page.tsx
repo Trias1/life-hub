@@ -5,9 +5,9 @@ import { FIELD, decryptField } from "@/lib/data-crypto.mjs"
 import { NoteDetail } from "@/components/notes/note-detail"
 import { relativeTime } from "@/lib/relative-time"
 import { formatDateTime } from "@/lib/format-date"
-import { ancestorRows, descendantIds, flattenTree } from "@/lib/note-tree.mjs"
+import { ancestorRows, childrenByParent, descendantIds, flattenTree } from "@/lib/note-tree.mjs"
 import { getWorkspaceContext } from "@/lib/workspace/server"
-import { archiveNote, createNote, deleteNotePermanently, restoreNote, restoreNoteVersion, toggleNoteFavorite, trashNote, updateNote } from "../actions"
+import { archiveNote, createNote, deleteNotePermanently, reorderSubPages, restoreNote, restoreNoteVersion, toggleNoteFavorite, trashNote, updateNote } from "../actions"
 
 export default async function NotePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params
@@ -30,7 +30,7 @@ export default async function NotePage({ params, searchParams }: { params: Promi
     context.supabase.from("notes").select("folder").eq("workspace_id", context.workspaceId).is("deleted_at", null),
     context.supabase.from("profiles").select("display_name").eq("id", context.user.id).maybeSingle(),
     // Active notes only (titles and links, no content) for the Pages panel, breadcrumb and the Parent picker.
-    context.supabase.from("notes").select("id,title,parent_id,author_id").eq("workspace_id", context.workspaceId).is("deleted_at", null).is("archived_at", null).order("created_at", { ascending: true }).limit(2000),
+    context.supabase.from("notes").select("id,title,parent_id,author_id,sort_order,created_at").eq("workspace_id", context.workspaceId).is("deleted_at", null).is("archived_at", null).order("created_at", { ascending: true }).limit(2000),
   ])
   const isAuthor = note.author_id === context.user.id
   // Profiles are only readable by their owner, so other authors stay anonymous.
@@ -43,9 +43,9 @@ export default async function NotePage({ params, searchParams }: { params: Promi
   const ancestors = active ? ancestorRows(rows, note.id) : []
   const rootId = ancestors[0]?.id ?? note.id
   const inTree = new Set([rootId, ...descendantIds(rows, rootId)])
-  const pages = active ? rows.filter((row) => inTree.has(row.id)).map((row) => ({ id: row.id, title: row.title, parentId: row.parent_id })) : []
+  const pages = active ? rows.filter((row) => inTree.has(row.id)).map((row) => ({ id: row.id, title: row.title, parentId: row.parent_id, sortOrder: row.sort_order, createdAt: row.created_at })) : []
   const parent = ancestors.at(-1) ?? null
-  const subPages = active ? rows.filter((row) => row.parent_id === note.id).map((row) => ({ id: row.id, title: row.title })) : []
+  const subPages = active ? (childrenByParent(rows).get(note.id) ?? []).map((row) => ({ id: row.id, title: row.title })) : []
   // A note can move under any of your own active notes except itself and its own sub-pages.
   const ownSubtree = new Set([note.id, ...descendantIds(rows, note.id)])
   const parentOptions = isAuthor
@@ -79,7 +79,7 @@ export default async function NotePage({ params, searchParams }: { params: Promi
           parent={parent ? { id: parent.id, title: parent.title } : null}
           subPages={subPages}
           parentOptions={parentOptions}
-          actions={{ updateNote, restoreNoteVersion, archiveNote, trashNote, restoreNote, deleteNotePermanently, toggleFavorite: toggleNoteFavorite, createNote }}
+          actions={{ updateNote, restoreNoteVersion, archiveNote, trashNote, restoreNote, deleteNotePermanently, toggleFavorite: toggleNoteFavorite, createNote, reorderSubPages }}
         />
       </div>
     </div>

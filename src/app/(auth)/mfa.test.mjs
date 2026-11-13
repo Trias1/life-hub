@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import test from "node:test"
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8")
-const middleware = read("../../middleware.ts")
+const middleware = read("../../proxy.ts")
 const authForm = read("../../components/auth/auth-form.tsx")
 const challenge = read("../../components/auth/mfa-challenge-form.tsx")
 const settings = read("../../components/security/two-factor-settings.tsx")

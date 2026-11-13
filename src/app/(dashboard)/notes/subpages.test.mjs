@@ -57,7 +57,7 @@ test("archive, trash, restore and delete act on the page and its sub-pages, scop
 })
 
 test("the note page shows pages, parent and contents without loading other notes' content", () => {
-  assert.match(page, /from\("notes"\)\.select\("id,title,parent_id,author_id"\)\.eq\("workspace_id", context\.workspaceId\)\.is\("deleted_at", null\)\.is\("archived_at", null\)/)
+  assert.match(page, /from\("notes"\)\.select\("id,title,parent_id,author_id,sort_order,created_at"\)\.eq\("workspace_id", context\.workspaceId\)\.is\("deleted_at", null\)\.is\("archived_at", null\)/)
   assert.match(page, /row\.author_id === context\.user\.id && !ownSubtree\.has\(row\.id\)/)
   assert.match(detail, /<NotePages pages=\{pages\} currentId=\{note\.id\}/)
   assert.match(detail, /formData\.set\("parentId", draft\.parentId\)/)
@@ -68,4 +68,28 @@ test("the note page shows pages, parent and contents without loading other notes
 test("the notes list nests sub-pages only when nothing is filtered", () => {
   assert.match(list, /const asTree = view === "active" && !filtered/)
   assert.match(list, /<NoteList rows=\{listRows\} \/>/)
+})
+
+test("sub-pages are reordered only among your own children of that page", () => {
+  const source = actions.slice(actions.indexOf("export async function reorderSubPages"))
+  assert.match(source, /\.eq\("parent_id", input\.data\.parentId\)\.eq\("workspace_id", context\.workspaceId\)\.eq\("author_id", context\.user\.id\)\.is\("deleted_at", null\)\.is\("archived_at", null\)/)
+  assert.match(source, /own\.size !== input\.data\.order\.length \|\| input\.data\.order\.some\(\(id\) => !own\.has\(id\)\)/)
+  assert.match(source, /update\(\{ sort_order: index \}\)\.eq\("id", id\)\.eq\("parent_id", input\.data\.parentId\)\.eq\("workspace_id", context\.workspaceId\)\.eq\("author_id", context\.user\.id\)/)
+  assert.match(detail, /reorder=\{canEdit && state === "active" \? actions\.reorderSubPages : undefined\}/)
+})
+
+test("the list offers a new sub-page only on your own active notes, and the form checks the parent", () => {
+  const newPage = read("./new/page.tsx")
+  assert.match(list, /canAddSubPage: view === "active" && note\.author_id === context\.user\.id/)
+  assert.match(newPage, /\.eq\("id", parentId\)\.eq\("workspace_id", context\.workspaceId\)\.eq\("author_id", context\.user\.id\)\.is\("deleted_at", null\)\.is\("archived_at", null\)/)
+})
+
+test("recovery codes: hashed, single use, throttled, and they remove the factors server-side", () => {
+  const recovery = read("../../(auth)/mfa/actions.ts")
+  assert.match(recovery, /user\.aal !== "aal2"/)
+  assert.match(recovery, /p_bucket: "password"/)
+  assert.match(recovery, /\(limit as \{ allowed\?: boolean \}\)\.allowed !== true/)
+  assert.match(recovery, /update\(\{ used_at: new Date\(\)\.toISOString\(\) \}\)\.eq\("user_id", user\.userId\)\.eq\("code_hash", hashRecoveryCode\(user\.userId, code\)\)\.is\("used_at", null\)/)
+  assert.match(recovery, /admin\.auth\.admin\.mfa\.deleteFactor\(\{ id: factor\.id, userId: user\.userId \}\)/)
+  assert.doesNotMatch(recovery, /code_hash: code\b/)
 })

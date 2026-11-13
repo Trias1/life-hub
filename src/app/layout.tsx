@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, Manrope } from "next/font/google";
+import { connection } from "next/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,11 +28,14 @@ export const metadata: Metadata = {
   description: "A focused workspace for work and life.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Render every page per request: the CSP nonce from src/proxy.ts only reaches pages rendered at
+  // request time, and a prerendered page would have its scripts blocked.
+  await connection();
   return (
     <html
       lang="en"

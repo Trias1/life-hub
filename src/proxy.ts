@@ -1,8 +1,13 @@
 import { apiBucket, checkRequestLimit, isCrossOriginApiMutation } from "@/lib/request-rate-limit.mjs"
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { newNonce, pageCsp } from "@/lib/csp.mjs"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  // Pages get a strict CSP with a fresh nonce. Next.js reads it from the request header and puts the
+  // nonce on its own scripts; the same policy goes back on the response for the browser to enforce.
+  const csp = request.nextUrl.pathname.startsWith("/api/") ? null : pageCsp({ nonce: newNonce(), supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL, dev: process.env.NODE_ENV === "development" })
+  if (csp) request.headers.set("Content-Security-Policy", csp)
   let response = NextResponse.next({ request })
   const bucket = apiBucket(request.nextUrl.pathname)
   const reject = (status: number, error: string, retryAfter?: number) => {
@@ -62,6 +67,7 @@ export async function middleware(request: NextRequest) {
   if (userId && !needsMfa && path === "/mfa") return redirectTo("/dashboard")
   // Already signed in: skip the auth forms and go straight to the workspace.
   if (userId && (path === "/login" || path === "/register" || path === "/")) return redirectTo("/dashboard")
+  if (csp) response.headers.set("Content-Security-Policy", csp)
   return response
 }
 
