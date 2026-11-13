@@ -31,7 +31,7 @@ export function Select({ name, defaultValue, value, onChange, options, placehold
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content className="custom-select-content" position="popper" sideOffset={5}>
-          <SelectPrimitive.Viewport>
+          <SelectPrimitive.Viewport className="custom-select-viewport">
             {options.map((option) => <SelectPrimitive.Item key={option.value} value={toRadix(option.value) ?? EMPTY} className="custom-select-item"><SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText><SelectPrimitive.ItemIndicator className="custom-select-item-indicator"><Check size={14} /></SelectPrimitive.ItemIndicator></SelectPrimitive.Item>)}
           </SelectPrimitive.Viewport>
         </SelectPrimitive.Content>
