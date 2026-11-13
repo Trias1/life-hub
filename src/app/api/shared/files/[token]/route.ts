@@ -7,10 +7,24 @@ import { getStorageForWorkspace, storageResponseHeaders } from "@/lib/storage/st
 
 export const runtime = "nodejs"
 
+/**
+ * The client for the per-IP limit: Vercel sets x-real-ip / x-forwarded-for itself (a client can't
+ * forge them there). Only a SHA-256 of it is sent to the database.
+ */
+function clientHash(request: Request) {
+  const ip = request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
+  return createHash("sha256").update("share-download:" + ip).digest("hex")
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
+  const admin = createAdminClient()
+  // Public links need no account, so they're limited per client (30 a minute, migration 0039). Fail closed.
+  const { data: limit, error: limitError } = await admin.rpc("consume_public_rate_limit", { p_bucket: "share-download", p_client_hash: clientHash(request) })
+  const verdict = limit as { allowed?: boolean; retry_after?: number } | null
+  if (limitError || !verdict || typeof verdict.allowed !== "boolean") return NextResponse.json({ error: "Try again in a minute" }, { status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" } })
+  if (!verdict.allowed) return NextResponse.json({ error: "Too many downloads. Try again in a minute." }, { status: 429, headers: { "Retry-After": String(Math.max(1, Math.min(60, verdict.retry_after ?? 60))), "Cache-Control": "no-store" } })
   const token = z.string().uuid().safeParse((await params).token)
   if (!token.success) return NextResponse.json({ error: "Invalid share link" }, { status: 404 })
-  const admin = createAdminClient()
   const tokenHash = createHash("sha256").update(token.data).digest("hex")
   const { data: share, error: shareError } = await admin.from("file_shares").select("file_id,workspace_id,expires_at").eq("token_hash", tokenHash).maybeSingle()
   if (shareError || !share || (share.expires_at && new Date(share.expires_at).getTime() <= Date.now())) return NextResponse.json({ error: "Share link expired or not found" }, { status: 404 })

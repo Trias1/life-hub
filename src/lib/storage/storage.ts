@@ -24,6 +24,13 @@ export type StorageDownload = {
   sizeBytes?: number
 }
 
+/** Checked on the file's metadata before any bytes are read; a mismatch throws. */
+export type DownloadRequirements = {
+  /** The file must sit directly in this folder. */
+  parentId?: string
+  mimeType?: RegExp
+}
+
 export type StorageUsage = {
   usedBytes: number
   limitBytes: number | null
@@ -33,7 +40,7 @@ export interface StorageService {
   ensureFolder(path: string[]): Promise<string>
   getUsage(): Promise<StorageUsage>
   upload(input: StorageUploadInput): Promise<StoredObject>
-  download(fileId: string): Promise<StorageDownload>
+  download(fileId: string, requirements?: DownloadRequirements): Promise<StorageDownload>
   delete(fileId: string): Promise<void>
   rename(fileId: string, name: string): Promise<StoredObject>
   move(fileId: string, parentId: string): Promise<StoredObject>

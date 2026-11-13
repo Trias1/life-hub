@@ -76,7 +76,13 @@ await storage.download("valid")
 assert.equal(mediaReads, 2)
 assert.deepEqual(savedRoots.slice(-1), ["root-folder"])
 for (const fileId of ["foreign", "legacy", "cycle"]) await assert.rejects(() => storage.download(fileId))
+// /api/images: only raster images sitting directly in the expected folder, checked before any bytes are read.
+await assert.rejects(() => storage.download("valid", { parentId: "workspace-folder" }))
+await assert.rejects(() => storage.download("valid", { mimeType: /^application\/pdf$/ }))
 assert.equal(mediaReads, 2, "Denied files must never fetch media")
+await storage.download("valid", { parentId: "nested", mimeType: /^image\/png$/ })
+assert.equal(mediaReads, 3)
+mediaReads = 2
 assert.equal("makePublic" in storage, false)
 rootId = "root-folder"
 for (const fileId of ["foreign", "legacy", "cycle", "shortcut", "trashed", "invalid/id", "workspace-folder"]) {
@@ -189,4 +195,18 @@ for (const route of ["files/[id]/download", "file-versions/[id]/download", "shar
   assert.match(source, /\.download\(/)
 }
 assert.doesNotMatch(readFileSync(new URL("../src/app/api/notes/upload-image/route.ts", import.meta.url), "utf8"), /makePublic/)
+const imagesRoute = readFileSync(new URL("../src/app/api/images/[fileId]/route.ts", import.meta.url), "utf8")
+assert.match(imagesRoute, /ensureFolder\(\["workspaces", context\.workspaceId, "images"\]\)/)
+assert.match(imagesRoute, /download\(fileId, \{ parentId: imagesFolder, mimeType: NOTE_IMAGE \}\)/)
+assert.match(readFileSync(new URL("../src/app/api/notes/upload-image/route.ts", import.meta.url), "utf8"), /ensureFolder\(\["workspaces", context\.workspaceId, "images"\]\)/, "uploads and reads use the same folder")
+const sharedRoute = readFileSync(new URL("../src/app/api/shared/files/[token]/route.ts", import.meta.url), "utf8")
+assert.ok(sharedRoute.indexOf("consume_public_rate_limit") < sharedRoute.indexOf(".download("), "public share links are limited before any download")
+assert.match(sharedRoute, /if \(limitError \|\| !verdict \|\| typeof verdict\.allowed !== "boolean"\) return NextResponse\.json\(\{ error: "Try again in a minute" \}, \{ status: 503/)
+const filesActions = readFileSync(new URL("../src/app/(dashboard)/files/actions.ts", import.meta.url), "utf8")
+for (const [action, bucket] of [["uploadFile", "upload"], ["uploadFileVersion", "upload"], ["createFileShare", "export"]]) {
+  const start = filesActions.indexOf("export async function " + action + "(")
+  const body = filesActions.slice(start, filesActions.indexOf("\nexport async function ", start + 1))
+  assert.match(body, new RegExp('await limitOrFail\\(context, "' + bucket + '"'), action + " is rate limited")
+  assert.ok(body.indexOf("limitOrFail") < body.search(/storage\.upload|from\("file_shares"\)\.insert/), action + " checks the limit first")
+}
 console.log("Storage security checks passed")

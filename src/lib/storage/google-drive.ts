@@ -1,7 +1,7 @@
 import { google } from "googleapis"
 import { Readable } from "node:stream"
 import { createGoogleOAuthClient, getWorkspaceDriveConnection, saveWorkspaceDriveRoot, GOOGLE_DRIVE_SCOPE } from "@/lib/google-drive-auth"
-import type { StorageDownload, StorageService, StorageUploadInput, StorageUsage, StoredObject } from "./storage"
+import type { StorageDownload, StorageService, StorageUploadInput, StorageUsage, StoredObject, DownloadRequirements } from "./storage"
 
 const FOLDER_MIME = "application/vnd.google-apps.folder"
 
@@ -139,10 +139,12 @@ export function googleDriveStorage(workspaceId?: string): StorageService {
     }
   }
 
-  async function download(fileId: string): Promise<StorageDownload> {
+  async function download(fileId: string, requirements: DownloadRequirements = {}): Promise<StorageDownload> {
     const { drive, connection } = await driveForRequest()
     await assertWorkspaceObject(drive, connection, fileId)
-    const metadata = await drive.files.get({ fileId, fields: "id,name,mimeType,size", supportsAllDrives: true })
+    const metadata = await drive.files.get({ fileId, fields: "id,name,mimeType,size,parents", supportsAllDrives: true })
+    if (requirements.parentId && !metadata.data.parents?.includes(requirements.parentId)) throw new Error("File is not in the expected folder")
+    if (requirements.mimeType && !requirements.mimeType.test(metadata.data.mimeType ?? "")) throw new Error("Unexpected file type")
     const response = await drive.files.get({ fileId, alt: "media", supportsAllDrives: true }, { responseType: "stream" })
     return { body: response.data as Readable, name: metadata.data.name ?? "download", mimeType: metadata.data.mimeType ?? "application/octet-stream", sizeBytes: Number(metadata.data.size ?? 0) }
   }

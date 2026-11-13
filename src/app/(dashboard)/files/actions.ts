@@ -7,6 +7,7 @@ import { z } from "zod"
 import { actionFailure } from "@/lib/actions/server"
 import { getStorageForWorkspace } from "@/lib/storage/storage"
 import { getWorkspaceContext, recordActivity } from "@/lib/workspace/server"
+import { checkRequestLimit } from "@/lib/request-rate-limit.mjs"
 
 const MAX_SIZE = 10 * 1024 * 1024
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain", "application/zip", "application/x-zip-compressed", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "video/mp4", "audio/mpeg", "audio/wav"])
@@ -16,12 +17,19 @@ function storageError(error: unknown) {
   return error instanceof Error ? error : { message: String(error) }
 }
 
+/** Uploads and share links count against the per-user limits from migration 0030 (fail closed). */
+async function limitOrFail(context: NonNullable<Awaited<ReturnType<typeof getWorkspaceContext>>>, bucket: "upload" | "export", back: string) {
+  const denied = await checkRequestLimit(context.supabase, bucket)
+  if (denied) redirect(back + (back.includes("?") ? "&" : "?") + "error=" + encodeURIComponent(denied.status === 429 ? "Too many requests. Wait a minute and try again." : "Couldn't check the request limit. Try again in a minute."))
+}
+
 export async function uploadFile(formData: FormData): Promise<void> {
   const value = formData.get("file")
   const folder = folderSchema.safeParse(formData.get("folder") ?? "General")
   if (!(value instanceof File) || value.size === 0 || value.size > MAX_SIZE || !ALLOWED_TYPES.has(value.type) || !folder.success) actionFailure("/files/upload", "upload file")
   const context = await getWorkspaceContext()
   if (!context) actionFailure("/files/upload", "access the active workspace")
+  await limitOrFail(context, "upload", "/files/upload")
   const storage = getStorageForWorkspace(context.workspaceId)
 
   const safeName = value.name.replace(/[^a-zA-Z0-9._-]/g, "-")
@@ -126,6 +134,7 @@ export async function uploadFileVersion(formData: FormData): Promise<void> {
   if (!fileId.success || !(value instanceof File) || value.size === 0 || value.size > MAX_SIZE || !ALLOWED_TYPES.has(value.type)) actionFailure(back, "upload file version")
   const context = await getWorkspaceContext()
   if (!context) actionFailure(back, "access the active workspace")
+  await limitOrFail(context, "upload", back)
 
   const { data: file, error: fileError } = await context.supabase.from("files").select("id").eq("id", fileId.data).eq("workspace_id", context.workspaceId).eq("uploader_id", context.user.id).maybeSingle()
   if (fileError || !file) actionFailure(back, "find file", fileError ?? new Error("File not found"))
@@ -159,6 +168,8 @@ export async function createFileShare(formData: FormData): Promise<void> {
   const back = "/files/" + input.data.id
   const context = await getWorkspaceContext()
   if (!context) actionFailure(back, "access the active workspace")
+  // Share links are long-lived keys to a file: a tight per-user budget (5 a minute).
+  await limitOrFail(context, "export", back)
   const { data: file, error: fileError } = await context.supabase.from("files").select("id").eq("id", input.data.id).eq("workspace_id", context.workspaceId).maybeSingle()
   if (fileError || !file) actionFailure(back, "find file", fileError ?? new Error("File not found"))
 

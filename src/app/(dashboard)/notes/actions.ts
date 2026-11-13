@@ -9,6 +9,7 @@ import { FIELD, decryptField, encryptField } from "@/lib/data-crypto.mjs"
 import { IMPORT_LIMITS, entryHtml, parseNotesFile } from "@/lib/notes-import.mjs"
 import { descendantIds } from "@/lib/note-tree.mjs"
 import { DOCUMENT_LIMITS, documentToNote } from "@/lib/document-import"
+import { checkRequestLimit } from "@/lib/request-rate-limit.mjs"
 
 // Note HTML: room for long runbooks imported from Markdown or Word.
 const NOTE_CONTENT_MAX = 150_000
@@ -328,6 +329,8 @@ export async function importDocuments(formData: FormData): Promise<void> {
   if (!options.success || !parentId.success) importFailure("Use a folder name of up to 80 characters and fewer tags.")
   const context = await getWorkspaceContext()
   if (!context) importFailure("Your session expired. Sign in again.")
+  const denied = await checkRequestLimit(context.supabase, "upload")
+  if (denied) importFailure(denied.status === 429 ? "Too many imports. Wait a minute and try again." : "Couldn't check the request limit. Try again in a minute.")
   const parent = parentId.data ? await findOwnActiveNote(context, parentId.data) : null
   if (parentId.data && !parent) importFailure("The note to put these under wasn't found. Pick another one.")
 

@@ -38,3 +38,15 @@ test("the database enforces aal2 for enrolled accounts on every RLS table", () =
   assert.match(migration, /as restrictive for all to authenticated using \(\(select public\.mfa_requirement_met\(\)\)\)/)
   assert.match(migration, /c\.relrowsecurity/)
 })
+
+test("the invitation and workspace RPCs check the 2FA step too (0038)", () => {
+  const rpc = read("../../../supabase/migrations/0038_mfa_for_rpc_functions.sql")
+  for (const name of ["create_workspace", "accept_workspace_invitation", "list_my_invitations", "respond_to_my_invitation"]) {
+    const wrapper = rpc.slice(rpc.indexOf("create or replace function public." + name + "("))
+    assert.match(wrapper.slice(0, 600), /perform public\.require_mfa_step\(\);/, name + " checks 2FA first")
+    assert.ok(rpc.includes("grant execute on function public." + name + "("), name + " stays callable by signed-in users")
+  }
+  assert.match(rpc, /revoke all on function public\.%I\(%s\) from public, anon, authenticated/)
+  assert.match(rpc, /revoke all on function public\.ensure_workspace_membership\(\) from public, anon, authenticated;/)
+  assert.doesNotMatch(rpc, /function public.consume_request_rate_limit/, "the limiter stays usable at aal1 (recovery codes)")
+})
