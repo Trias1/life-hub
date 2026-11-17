@@ -1,0 +1,13 @@
+# Watchbell pre-deploy check: comments on each pull request with new vulnerable packages, possible secrets, the
+# Next.js version and new env names. Warning only, it never blocks a merge.
+name: Watchbell pre-deploy check
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  precheck:
+    uses: watchbell/watchbell/.github/workflows/precheck.yml@v1.6.0
+    with:
+      working-directory: .
